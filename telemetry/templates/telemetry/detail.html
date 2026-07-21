@@ -45,6 +45,7 @@
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
 }
+html { zoom: 0.9; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: var(--font-body);
@@ -1771,29 +1772,6 @@ body::after {
     });
   }
 
-  function showToast(text) {
-    var old = document.getElementById('findAlertMsg');
-    if (old) old.remove();
-    var msg = document.createElement('div');
-    msg.id = 'findAlertMsg';
-    msg.textContent = text;
-    msg.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:8px 16px;z-index:99999;font-family:var(--font-mono);font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);';
-    document.body.appendChild(msg);
-    setTimeout(function(){ msg.remove(); }, 2000);
-  }
-  function findAlert() {
-    var input = document.getElementById('findAlertInput');
-    var id = input.value.trim();
-    if (!id) return;
-    fetch('/api/alert-exists/' + encodeURIComponent(id) + '/')
-      .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
-      .then(function(data) {
-        if (data.exists) { window.location = '/alert/' + encodeURIComponent(id) + '/'; }
-        else { showToast('No alert found with this ID.'); }
-      })
-      .catch(function(){ showToast('Could not check alert. Please try again.'); });
-  }
-
   /* theme toggle */
   (function(){
     var saved = localStorage.getItem('wis2-theme');
@@ -1877,6 +1855,29 @@ body::after {
   })();
 
   })();
+
+  function showToast(text) {
+    var old = document.getElementById('findAlertMsg');
+    if (old) old.remove();
+    var msg = document.createElement('div');
+    msg.id = 'findAlertMsg';
+    msg.textContent = text;
+    msg.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:8px 16px;z-index:99999;font-family:var(--font-mono);font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+    document.body.appendChild(msg);
+    setTimeout(function(){ msg.remove(); }, 2000);
+  }
+  function findAlert() {
+    var input = document.getElementById('findAlertInput');
+    var id = input.value.trim();
+    if (!id) return;
+    fetch('/api/alert-exists/' + encodeURIComponent(id) + '/')
+      .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
+      .then(function(data) {
+        if (data.exists) { window.location = '/alert/' + encodeURIComponent(id) + '/'; }
+        else { showToast('No alert found with this ID.'); }
+      })
+      .catch(function(){ showToast('Could not check alert. Please try again.'); });
+  }
 
   /* --- Activity / Incident Collaboration --- */
   var activityAlertId = '{{ alert.id }}';

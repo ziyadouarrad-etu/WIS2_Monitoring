@@ -732,10 +732,12 @@ document.querySelectorAll('.msd').forEach(function(msd) {
 (function() {
   var debounceTimer;
   var fetching = false;
+  var lastChangedGroup = null;
   function applyFilterOptions(data) {
     Object.keys(data).forEach(function(key) {
       var group = document.querySelector('.msd-group[data-name="' + key + '"]');
       if (!group) return;
+      if (lastChangedGroup && key === lastChangedGroup) return;
       var valid = data[key] || [];
       var searchInput = group.querySelector('.msd-search input');
       var searchQ = searchInput ? searchInput.value.toLowerCase() : '';
@@ -754,6 +756,7 @@ document.querySelectorAll('.msd').forEach(function(msd) {
         }
       });
     });
+    lastChangedGroup = null;
   }
   function updateFilterOptions() {
     clearTimeout(debounceTimer);
@@ -785,10 +788,17 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     }, 120);
   }
   document.querySelectorAll('.msd-option input').forEach(function(cb) {
-    cb.addEventListener('change', updateFilterOptions);
+    cb.addEventListener('change', function() {
+      var g = cb.closest('.msd-group');
+      lastChangedGroup = g ? g.dataset.name : null;
+      updateFilterOptions();
+    });
   });
   document.querySelectorAll('.filter-group input[type="datetime-local"]').forEach(function(input) {
-    input.addEventListener('change', updateFilterOptions);
+    input.addEventListener('change', function() {
+      lastChangedGroup = null;
+      updateFilterOptions();
+    });
   });
   updateFilterOptions();
 })();
