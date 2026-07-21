@@ -1463,6 +1463,11 @@ body::after {
       <span class="sm-icon">&#9679;</span>
       <span>Account</span>
     </a>
+    <div class="sm-section-label">Reference</div>
+    <a href="{% url 'alarms_catalogue' %}" class="sm-item">
+      <span class="sm-icon">&#9632;</span>
+      <span>Documentation</span>
+    </a>
   </div>
   <div class="sm-footer">
     <form method="post" action="{% url 'logout' %}" style="margin:0;">
@@ -1647,7 +1652,7 @@ body::after {
   {% endif %}
   {% if history_page_obj %}
   <div class="card">
-    <div class="card-body">
+    <div class="card-body" id="historyContainer">
       <div class="history-header">
         <div class="section-label" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">Node History</div>
         <span class="history-count">{{ history_count }} total</span>
@@ -1666,23 +1671,23 @@ body::after {
       {% if history_page_obj.paginator.num_pages > 1 %}
       <div class="history-pagination">
         {% if history_page_obj.has_previous %}
-          <a class="history-page-link" href="?history_page={{ history_page_obj.previous_page_number }}">← Prev</a>
+          <a class="history-page-link" href="#" data-page="{{ history_page_obj.previous_page_number }}">&#8592; Prev</a>
         {% else %}
-          <span class="history-page-link history-page-disabled">← Prev</span>
+          <span class="history-page-link history-page-disabled">&#8592; Prev</span>
         {% endif %}
         {% for p in history_page_obj.paginator.page_range %}
           {% if p == history_page_obj.number %}
             <span class="history-page-link history-page-current">{{ p }}</span>
           {% elif p == 1 or p == history_page_obj.paginator.num_pages or p >= history_page_obj.number|add:"-2" and p <= history_page_obj.number|add:"2" %}
-            <a class="history-page-link" href="?history_page={{ p }}">{{ p }}</a>
+            <a class="history-page-link" href="#" data-page="{{ p }}">{{ p }}</a>
           {% elif p == history_page_obj.number|add:"-3" or p == history_page_obj.number|add:"3" %}
-            <span class="history-page-link history-page-disabled">…</span>
+            <span class="history-page-link history-page-disabled">&#8230;</span>
           {% endif %}
         {% endfor %}
         {% if history_page_obj.has_next %}
-          <a class="history-page-link" href="?history_page={{ history_page_obj.next_page_number }}">Next →</a>
+          <a class="history-page-link" href="#" data-page="{{ history_page_obj.next_page_number }}">Next &#8594;</a>
         {% else %}
-          <span class="history-page-link history-page-disabled">Next →</span>
+          <span class="history-page-link history-page-disabled">Next &#8594;</span>
         {% endif %}
       </div>
       {% endif %}
@@ -2072,6 +2077,25 @@ body::after {
   }
 
   fetchActivity();
+
+  /* history AJAX pagination */
+  (function(){
+    var container = document.getElementById('historyContainer');
+    if (!container) return;
+    var alertId = '{{ alert.id }}';
+    container.addEventListener('click', function(e) {
+      var link = e.target.closest('.history-page-link[data-page]');
+      if (!link) return;
+      e.preventDefault();
+      var page = link.getAttribute('data-page');
+      fetch('/api/alert/' + alertId + '/history/?history_page=' + page)
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          container.innerHTML = html;
+          container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    });
+  })();
 </script>
 </body>
 </html>

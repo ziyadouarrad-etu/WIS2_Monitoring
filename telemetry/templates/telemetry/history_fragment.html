@@ -1,0 +1,40 @@
+{% if history_page_obj %}
+<div class="history-header">
+  <div class="section-label" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">Node History</div>
+  <span class="history-count">{{ history_count }} total</span>
+</div>
+<div class="history-grid">
+  {% for h in history_page_obj %}
+  <a href="{% url 'alert_detail' h.id %}" class="history-card">
+    <div class="history-card-inner">
+      <span class="history-time">{{ h.event_time|date:"Y-m-d H:i" }}</span>
+      <span class="history-sev history-sev-{{ h.severity|lower }}">{{ h.severity }}</span>
+      <span class="history-title">{{ h.display_title|default:h.title|default:h.event_type }}{% if h.subtype %} <small>({{ h.subtype }})</small>{% endif %}</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% if history_page_obj.paginator.num_pages > 1 %}
+<div class="history-pagination">
+  {% if history_page_obj.has_previous %}
+    <a class="history-page-link" href="#" data-page="{{ history_page_obj.previous_page_number }}">&#8592; Prev</a>
+  {% else %}
+    <span class="history-page-link history-page-disabled">&#8592; Prev</span>
+  {% endif %}
+  {% for p in history_page_obj.paginator.page_range %}
+    {% if p == history_page_obj.number %}
+      <span class="history-page-link history-page-current">{{ p }}</span>
+    {% elif p == 1 or p == history_page_obj.paginator.num_pages or p >= history_page_obj.number|add:"-2" and p <= history_page_obj.number|add:"2" %}
+      <a class="history-page-link" href="#" data-page="{{ p }}">{{ p }}</a>
+    {% elif p == history_page_obj.number|add:"-3" or p == history_page_obj.number|add:"3" %}
+      <span class="history-page-link history-page-disabled">&#8230;</span>
+    {% endif %}
+  {% endfor %}
+  {% if history_page_obj.has_next %}
+    <a class="history-page-link" href="#" data-page="{{ history_page_obj.next_page_number }}">Next &#8594;</a>
+  {% else %}
+    <span class="history-page-link history-page-disabled">Next &#8594;</span>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}

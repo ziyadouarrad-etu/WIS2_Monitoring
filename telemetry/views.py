@@ -840,3 +840,39 @@ def account_view(request):
     return render(request, 'telemetry/account.html', ctx)
 
 
+@login_required
+def alarms_catalogue(request):
+    return render(request, 'telemetry/catalogue.html')
+
+
+@login_required
+def alert_history_fragment(request, alert_id):
+    from django.shortcuts import get_object_or_404
+    from django.http import HttpResponse
+    user_qs = get_alerts_for_user(request.user)
+    alert = get_object_or_404(user_qs, id=alert_id)
+
+    history_page_obj = None
+    history_count = 0
+    if alert.node_id:
+        history_qs = user_qs.filter(
+            node=alert.node_id
+        ).exclude(id=alert.id).order_by('-event_time')
+        history_paginator = Paginator(history_qs, 6)
+        history_count = history_paginator.count
+        try:
+            history_page = int(request.GET.get('history_page', 1))
+        except (TypeError, ValueError):
+            history_page = 1
+        try:
+            history_page_obj = history_paginator.get_page(history_page)
+        except Exception:
+            history_page_obj = history_paginator.get_page(1)
+
+    ctx = {
+        'history_page_obj': history_page_obj,
+        'history_count': history_count,
+    }
+    return render(request, 'telemetry/history_fragment.html', ctx)
+
+

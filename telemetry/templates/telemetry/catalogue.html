@@ -1,0 +1,1631 @@
+{% extends "telemetry/base.html" %}
+{% block title %}WIS2 Global Telemetry — Documentation{% endblock %}
+{% block header_subtitle %}Documentation{% endblock %}
+
+{% block extra_css %}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(146,165,191,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(146,165,191,0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 75%);
+}
+
+.catalogue-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 0;
+  max-width: 1600px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 68px);
+}
+
+/* Sidebar navigation */
+.cat-sidebar {
+  position: sticky;
+  top: 68px;
+  align-self: start;
+  max-height: calc(100vh - 68px);
+  overflow-y: auto;
+  padding: 20px 0 20px 24px;
+  border-right: 1px solid var(--border);
+}
+.cat-sidebar-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 16px 0 6px;
+}
+.cat-sidebar-label:first-child { padding-top: 0; }
+.cat-sidebar a {
+  display: block;
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 3px 3px 0;
+  transition: all 0.12s;
+  line-height: 1.5;
+}
+.cat-sidebar a.sub {
+  padding-left: 24px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.cat-sidebar a:hover {
+  color: var(--text);
+  background: var(--bg-elevated);
+  border-left-color: var(--accent);
+}
+
+/* Main content */
+.cat-content {
+  padding: 32px 40px 60px;
+  max-width: 1000px;
+}
+
+.cat-hero {
+  margin-bottom: 36px;
+}
+.cat-hero h1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.cat-hero p {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  max-width: 720px;
+}
+
+/* Section blocks */
+.cat-section {
+  margin-bottom: 40px;
+}
+.cat-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.cat-section-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.cat-section-icon.sev { background: var(--critical-bg); color: var(--critical); }
+.cat-section-icon.event { background: var(--info-bg); color: var(--info); }
+.cat-section-icon.field { background: var(--accent-dim); color: var(--accent); }
+.cat-section-icon.wnm { background: rgba(171,71,188,0.12); color: #ab47bc; }
+.cat-section-icon.error { background: var(--critical-bg); color: var(--critical); }
+.cat-section-icon.test { background: var(--success-bg); color: var(--success); }
+.cat-section-icon.link { background: rgba(66,165,245,0.12); color: #42a5f5; }
+.cat-section-icon.incident { background: var(--warning-bg); color: var(--warning); }
+.cat-section-icon.cat { background: rgba(255,167,38,0.12); color: #ffa726; }
+.cat-section-icon.display { background: rgba(102,187,106,0.12); color: #66bb6a; }
+.cat-section-icon.arch { background: rgba(171,71,188,0.12); color: #ce93d8; }
+.cat-section-icon.net { background: rgba(255,167,38,0.12); color: #ffb74d; }
+.cat-section-icon.cache { background: rgba(66,165,245,0.12); color: #64b5f6; }
+.cat-section-icon.proto { background: rgba(239,83,80,0.12); color: #ef9a9a; }
+.cat-section-icon.schema { background: rgba(171,71,188,0.12); color: #ce93d8; }
+.cat-section-icon.system { background: rgba(255,213,79,0.12); color: #ffd54f; }
+.cat-section-icon.resp { background: var(--accent-dim); color: var(--accent); }
+
+.cat-section h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+.cat-section h3 {
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #82b1ff;
+  margin: 24px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(130,177,255,0.15);
+}
+.cat-section h4 {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 16px 0 8px;
+  padding: 8px 12px;
+  background: var(--bg-inset);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+.cat-section-desc {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+.cat-section p {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+
+/* Reference tables */
+.cat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.cat-table th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+.cat-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(31,45,66,0.4);
+  vertical-align: top;
+  line-height: 1.5;
+}
+.cat-table tr:last-child td { border-bottom: none; }
+.cat-table tr:hover td { background: var(--bg-elevated); }
+.cat-table code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+/* Severity badges */
+.sev-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.sev-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sev-badge-critical { background: var(--critical-bg); color: var(--critical); }
+.sev-badge-error { background: var(--error-bg); color: var(--error); }
+.sev-badge-warning { background: var(--warning-bg); color: var(--warning); }
+.sev-badge-info { background: var(--info-bg); color: var(--info); }
+
+/* Category chips */
+.cat-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  margin: 2px 4px 2px 0;
+  white-space: nowrap;
+}
+
+/* Info callout boxes */
+.cat-callout {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: var(--bg-card);
+}
+.cat-callout.critical { border-left: 3px solid var(--critical); }
+.cat-callout.warning { border-left: 3px solid var(--warning); }
+.cat-callout.info { border-left: 3px solid var(--info); }
+.cat-callout.accent { border-left: 3px solid var(--accent); }
+.cat-callout-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.cat-callout p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.cat-callout code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent);
+}
+
+/* Field cards */
+.field-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: var(--bg-card);
+  transition: border-color 0.15s;
+}
+.field-card:hover { border-color: var(--border-hover); }
+.field-card-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.field-card-type {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.field-card-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Alert detail blocks */
+.alert-detail {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--bg-card);
+}
+.alert-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.alert-detail-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.alert-detail-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.alert-detail-body p {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.alert-detail-body strong {
+  color: var(--text);
+}
+
+/* Prose sections */
+.prose ul, .prose ol {
+  margin: 8px 0 16px 20px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.prose li {
+  margin-bottom: 6px;
+}
+.prose strong {
+  color: var(--text);
+}
+.prose a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.prose a:hover {
+  text-decoration: underline;
+}
+
+/* Source list */
+.source-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.source-list li {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(31,45,66,0.3);
+}
+.source-list li:last-child { border-bottom: none; }
+.source-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-right: 6px;
+}
+.source-list a {
+  color: var(--accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+.source-list a:hover { text-decoration: underline; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .catalogue-layout {
+    grid-template-columns: 1fr;
+  }
+  .cat-sidebar {
+    position: static;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .cat-sidebar-label { display: none; }
+  .cat-sidebar a, .cat-sidebar a.sub {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  .cat-content { padding: 24px 20px 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-sidebar a { transition: none; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="catalogue-layout">
+  <nav class="cat-sidebar" id="catSidebar">
+    <div class="cat-sidebar-label">Overview</div>
+    <a href="#introduction">Introduction</a>
+    <a href="#architecture">WME Architecture</a>
+    <a href="#severity">Severity Levels</a>
+    <a href="#event-types">Event Types</a>
+    <a href="#categories">Categories</a>
+    <div class="cat-sidebar-label">Infrastructure Analysis</div>
+    <a href="#sec3">Broker Disconnections</a>
+    <a href="#sec3-1" class="sub">Redundancy Degradation</a>
+    <a href="#sec3-2" class="sub">Total Isolation</a>
+    <a href="#sec4">Cache &amp; Data Flow</a>
+    <a href="#sec4-1" class="sub">Ghosting Phenomenon</a>
+    <a href="#sec4-2" class="sub">Rate Limiting</a>
+    <a href="#sec5">Protocol Terminations</a>
+    <a href="#sec5-1" class="sub">Timeouts</a>
+    <a href="#sec5-2" class="sub">EOF &amp; Access Denials</a>
+    <a href="#sec6">Schema Validation</a>
+    <a href="#sec6-1" class="sub">Payload Validation</a>
+    <a href="#sec6-2" class="sub">Dark Data</a>
+    <a href="#sec6-3" class="sub">ETS &amp; KPIs</a>
+    <div class="cat-sidebar-label">Systemic Telemetry</div>
+    <a href="#sec7">Lifecycle &amp; Threats</a>
+    <a href="#sec7-1" class="sub">Maintenance</a>
+    <a href="#sec7-2" class="sub">Anti-Loop</a>
+    <a href="#sec7-3" class="sub">GDC Latency</a>
+    <a href="#sec7-4" class="sub">Sensor Centres</a>
+    <a href="#sec8">Response Framework</a>
+    <div class="cat-sidebar-label">Alert Reference</div>
+    <a href="#alert-fields">Core Fields</a>
+    <a href="#alert-ids">Identifiers</a>
+    <a href="#alert-meta">Metadata</a>
+    <a href="#alert-content">Content Fields</a>
+    <a href="#wnm">WNM Payload</a>
+    <a href="#errors">Errors</a>
+    <a href="#tests">Tests (ETS)</a>
+    <a href="#summary">Summary</a>
+    <a href="#links">Links</a>
+    <div class="cat-sidebar-label">System</div>
+    <a href="#incidents">Incidents</a>
+    <a href="#display-titles">Display Titles</a>
+    <a href="#nodes">Nodes &amp; Sources</a>
+    <a href="#sources">Sources</a>
+  </nav>
+
+  <main class="cat-content">
+    <div class="cat-hero">
+      <h1>WIS2 Alert Documentation</h1>
+      <p>A comprehensive reference for the WIS2 Monitoring Events (WME) framework, covering infrastructure diagnostics, schema validation, systemic telemetry, and actionable response strategies. Based on the WMO WIS2 Monitoring Events specification and empirical telemetry analysis.</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 1: INTRODUCTION -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="introduction">
+      <div class="cat-section-header">
+        <div class="cat-section-icon arch">&#9670;</div>
+        <h2>1. Introduction to the WIS2 Observability Framework</h2>
+      </div>
+
+      <p>The transition of the World Meteorological Organization (WMO) to the Information System 2.0 (WIS2) represents a fundamental architectural evolution. Moving away from the legacy, point-to-point file exchange mechanisms characteristic of the Global Telecommunication System (GTS), WIS2 embraces a highly available, globally distributed Publish/Subscribe (PubSub) architecture.</p>
+
+      <p>This modern paradigm relies upon a synergistic network of core infrastructure components known as <strong>Global Services</strong>:</p>
+      <ul style="margin:8px 0 16px 20px; font-size:13.5px; color:var(--text-secondary); line-height:1.7;">
+        <li><strong>Global Brokers</strong> — message routing</li>
+        <li><strong>Global Caches</strong> — data payload hosting</li>
+        <li><strong>Global Discovery Catalogues (GDCs)</strong> — centralized metadata querying and discoverability</li>
+      </ul>
+
+      <div class="cat-callout accent">
+        <div class="cat-callout-title">Performance Mandates</div>
+        <p>Global Brokers must achieve at least <strong>99.5% service availability</strong>, process a minimum of <strong>10,000 messages per second</strong>, and seamlessly support <strong>hundreds of concurrent WIS2 Nodes</strong>.</p>
+      </div>
+
+      <p>The WME specification mandates the use of the <strong>CloudEvents</strong> standard, encoded in JSON, broadcast over a dedicated MQTT topic hierarchy — specifically <code>monitor/a/wis2/#</code> — allowing Global Services and monitoring agents to continuously ingest state changes, error reports, and system health metrics. Through this mechanism, the WMO has established a real-time diagnostic nervous system capable of identifying everything from localized network timeouts to global schema validation failures.</p>
+
+      <div class="cat-callout info">
+        <div class="cat-callout-title">MQTT Topic Hierarchy</div>
+        <p>Agents subscribe to channels such as <code>monitor/a/wis2/+</code> (all centers) or <code>monitor/a/wis2/ca-eccc-msc/#</code> (center-specific), constructing a continuous, real-time topology of network health without generating polling overhead.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 2: ARCHITECTURE -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="architecture">
+      <div class="cat-section-header">
+        <div class="cat-section-icon arch">&#9881;</div>
+        <h2>2. Architectural Anatomy of WME</h2>
+      </div>
+
+      <p>WIS2 Monitoring Event Messages (WMEM) are strictly bounded by the <code>http://wis.wmo.int/spec/wme/1/req/monitoring-event-message-core</code> requirement class. Metadata payloads must not exceed <strong>8,192 bytes</strong>.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Property</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>id</code></td>
+            <td>UUIDv4</td>
+            <td>Unique event identifier. Prevents message collision and enables chronological tracing across distributed log aggregators.</td>
+          </tr>
+          <tr>
+            <td><code>type</code></td>
+            <td>String (Reverse DNS)</td>
+            <td>Defines the nature of the anomaly (e.g. <code>int.wmo.wis.wme.event.wcmp2.ets</code>, <code>int.wmo.wis.wme.wnm.validation.schema</code>).</td>
+          </tr>
+          <tr>
+            <td><code>source</code></td>
+            <td>String</td>
+            <td>The specific agent or monitoring service that detected the anomaly.</td>
+          </tr>
+          <tr>
+            <td><code>subject</code></td>
+            <td>String</td>
+            <td>Identifies the failing or notifying entity (the node being observed).</td>
+          </tr>
+          <tr>
+            <td><code>data.severity</code></td>
+            <td>Enum</td>
+            <td>Strictly enumerated: <code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>, <code>CRITICAL</code>.</td>
+          </tr>
+          <tr>
+            <td><code>data.content</code></td>
+            <td>Object</td>
+            <td>Human-readable diagnostic summaries.</td>
+          </tr>
+          <tr>
+            <td><code>data.links</code></td>
+            <td>Array</td>
+            <td>Machine-actionable endpoints for querying related metadata or documentation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SEVERITY LEVELS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="severity">
+      <div class="cat-section-header">
+        <div class="cat-section-icon sev">&#9888;</div>
+        <h2>Severity Levels</h2>
+      </div>
+      <p class="cat-section-desc">Every alert is assigned a severity level reflecting the urgency and impact of the issue.</p>
+      <table class="cat-table">
+        <thead>
+          <tr><th>Severity</th><th>Meaning</th><th>Typical Actions</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="sev-badge sev-badge-critical">CRITICAL</span></td>
+            <td>Systemic or total blackout. Node disconnected from all brokers, cache receiving zero bytes, target endpoint down. Immediate attention required.</td>
+            <td>Engage emergency fallback. Reroute to backup caches/brokers. Page standby engineers. Escalate to hardware/ISP level. Extensive postmortem upon restoration.</td>
+          </tr>
+          <tr>
+            <td><span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td>Isolated failure affecting specific data sets. WNM schema failure, HTTP 403/502, missing metadata, connection refused. Node is reachable but producing errors.</td>
+            <td>Quarantine malformed payload. Suspend downstream fetching. Alert data provider immediately. Require manual schema correction or WAF ACL whitelisting.</td>
+          </tr>
+          <tr>
+            <td><span class="sev-badge sev-badge-warning">WARNING</span></td>
+            <td>Degradation of redundancy or creeping friction. Disconnected from one broker, KPI score dipping, download errors. System is functional but degraded.</td>
+            <td>Trigger automated network diagnostics (traceroute, ping). Verify TLS certificates. Log non-urgent ticket for next-business-day review.</td>
+          </tr>
+          <tr>
+            <td><span class="sev-badge sev-badge-info">INFO</span></td>
+            <td>Non-disruptive routine telemetry. WCMP2 ETS passed, standard heartbeats, metadata reports. No immediate action required.</td>
+            <td>Ingest to time-series databases for long-term SLA reporting. Used by Sensor Centres to tune KPI algorithms and baseline anomaly detection thresholds.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- EVENT TYPES -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="event-types">
+      <div class="cat-section-header">
+        <div class="cat-section-icon event">&#9673;</div>
+        <h2>Event Types</h2>
+      </div>
+      <p class="cat-section-desc">Each alert carries a WME event type URI. The monitor displays the last two segments as a human-readable label.</p>
+      <table class="cat-table">
+        <thead>
+          <tr><th>Full URI</th><th>Display Label</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>int.wmo.wis.wme.event</code></td>
+            <td><strong>wme event</strong></td>
+            <td>General monitoring event. Node disconnections, maintenance notices, target-down alerts, endpoint errors, WCMP2 access failures, and most infrastructure alerts.</td>
+          </tr>
+          <tr>
+            <td><code>int.wmo.wis.wme.event.item.download</code></td>
+            <td><strong>event item.download</strong></td>
+            <td>Data download or cache retrieval failure. Cache ingestion failures, download errors, data server connectivity issues.</td>
+          </tr>
+          <tr>
+            <td><code>int.wmo.wis.wme.event.wcmp2.ets</code></td>
+            <td><strong>event wcmp2.ets</strong></td>
+            <td>WCMP2 Executable Test Suite report. Automated metadata compliance evaluation results.</td>
+          </tr>
+          <tr>
+            <td><code>int.wmo.wis.wme.event.wcmp2.kpi</code></td>
+            <td><strong>event wcmp2.kpi</strong></td>
+            <td>WCMP2 Key Performance Indicator report. Metadata quality and descriptiveness scoring.</td>
+          </tr>
+          <tr>
+            <td><code>int.wmo.wis.wme.event.notice</code></td>
+            <td><strong>event notice</strong></td>
+            <td>Scheduled maintenance or administrative notice. Planned outage announcements.</td>
+          </tr>
+          <tr>
+            <td><code>int.wmo.wis.wme.wnm.validation.metadata</code></td>
+            <td><strong>wnm validation.metadata</code></td>
+            <td>WNM metadata validation failure. Missing or invalid metadata record reference.</td>
+          </tr>
+          <tr>
+            <td><code>int.wmo.wis.wme.wnm.validation.schema</code></td>
+            <td><strong>wnm validation.schema</code></td>
+            <td>WNM schema validation failure. Notification message does not conform to the WNM schema specification.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- CATEGORIES -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="categories">
+      <div class="cat-section-header">
+        <div class="cat-section-icon cat">&#9632;</div>
+        <h2>Categories</h2>
+      </div>
+      <p class="cat-section-desc">Alerts are automatically classified into categories based on pattern matching against the title and description fields.</p>
+      <table class="cat-table">
+        <thead>
+          <tr><th>Category</th><th>Trigger Pattern</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="cat-chip">Node Disconnections</span></td>
+            <td>Title starts with <code>Disconnected WIS2 Node</code></td>
+            <td>A WIS2 node has gone offline or lost connectivity to the monitoring system.</td>
+          </tr>
+          <tr>
+            <td><span class="cat-chip">Global Cache &amp; Data Flow</span></td>
+            <td>Title contains <code>download errors</code>, <code>receiving any data</code>, starts with <code>No cache is receiving data</code>, <code>No data is received</code>, or <code>The Global Cache can not connect</code></td>
+            <td>Data is not flowing correctly through the global cache or data pipeline.</td>
+          </tr>
+          <tr>
+            <td><span class="cat-chip">Endpoint &amp; Protocol Errors</span></td>
+            <td>Description contains <code>context deadline exceeded</code>, <code>unexpected EOF</code>, <code>GOAWAY</code>, <code>connection refused</code>, <code>HTTP status</code>, <code>connection reset by peer</code>, <code>i/o timeout</code>. Or title starts with <code>Target</code> and ends with <code>is down</code>.</td>
+            <td>Network-level or HTTP protocol errors. Target server unreachable, timing out, or returning error responses.</td>
+          </tr>
+          <tr>
+            <td><span class="cat-chip">Schema &amp; Metadata Validation</span></td>
+            <td>Title starts with <code>Missing Metadata record</code> or <code>WIS2 Notification Message not compliant</code></td>
+            <td>A WIS2 notification failed validation against the required schema or is missing mandatory metadata references.</td>
+          </tr>
+          <tr>
+            <td><span class="cat-chip">Maintenance</span></td>
+            <td>Title or description contains <code>maintenance</code> or <code>template:</code></td>
+            <td>Planned maintenance activity or template notice. Usually informational.</td>
+          </tr>
+          <tr>
+            <td><span class="cat-chip">WCMP2 ...</span></td>
+            <td>Title starts with <code>WCMP2</code></td>
+            <td>WCMP2 related alerts. ETS compliance reports, access failures, KPI degradation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 3: NODE CONNECTIVITY & BROKER DISCONNECTIONS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="sec3">
+      <div class="cat-section-header">
+        <div class="cat-section-icon net">&#9741;</div>
+        <h2>3. Node Connectivity &amp; Broker Disconnections</h2>
+      </div>
+
+      <p>A foundational requirement of the WIS2 architecture is that every data-producing Node must maintain continuous, concurrent MQTT connections to multiple Global Brokers. This redundant mesh ensures that if one broker experiences a localized outage, WIS2 Notification Messages (WNMs) are still successfully routed through alternative paths.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Event Title</th><th>Severity</th><th>Event Type</th><th>Core System Impact</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Disconnected WIS2 Node from one Global Broker</td>
+            <td><span class="sev-badge sev-badge-warning">WARNING</span></td>
+            <td><code>int.wmo.wis.wme.event</code></td>
+            <td>Redundancy degradation; no data loss.</td>
+          </tr>
+          <tr>
+            <td>Disconnected WIS2 Node from multiple Global Brokers</td>
+            <td><span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td><code>int.wmo.wis.wme.event</code></td>
+            <td>Severe redundancy loss; elevated latency risk.</td>
+          </tr>
+          <tr>
+            <td>Disconnected WIS2 Node from all Global Brokers</td>
+            <td><span class="sev-badge sev-badge-critical">CRITICAL</span></td>
+            <td><code>int.wmo.wis.wme.event</code></td>
+            <td>Complete notification blackout; global data isolation.</td>
+          </tr>
+          <tr>
+            <td>Target is down</td>
+            <td><span class="sev-badge sev-badge-critical">CRITICAL</span></td>
+            <td><code>int.wmo.wis.wme.event</code></td>
+            <td>Node endpoint entirely unreachable for monitoring.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 3.1 -->
+      <div id="sec3-1">
+        <h3>3.1 Degradation of the Broker Redundancy Mesh</h3>
+
+        <h4>"Disconnected WIS2 Node from one Global Broker" — <span class="sev-badge sev-badge-warning">WARNING</span></h4>
+        <p><strong>Trigger:</strong> Global Monitor detects that the continuous heartbeat (or underlying TCP socket state) of a specific WIS2 Node has dropped from one of its configured target Global Brokers while remaining active on the others.</p>
+        <p><strong>Technical causes:</strong> Transient network routing anomalies across international submarine cables; firewall misconfigurations blocking outbound traffic on <strong>port 8883 (MQTTS)</strong> or <strong>port 443 (WSS)</strong>; or localized TLS handshake failures due to geographic load-balancing discrepancies.</p>
+        <p><strong>Impact on data flow:</strong> Negligible — inherent redundancy ensures WNMs are successfully published via the remaining connected brokers.</p>
+        <p><strong>Response:</strong> Network engineering teams review outbound firewall rules and perform diagnostic packet tracing to the specific disconnected broker.</p>
+
+        <h4>"Disconnected WIS2 Node from multiple Global Brokers" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Trigger:</strong> Simultaneous connection drops across two or more (but not all) Global Brokers.</p>
+        <p><strong>Technical causes:</strong> Regional internet backhaul outages; BGP route flapping affecting multiple international transit paths; or resource starvation within the Node's message queue client causing aggressive termination of parallel connection threads.</p>
+        <p><strong>Impact:</strong> While some redundancy remains, data flow is characterized by increased notification latency, and the Node operates precariously close to a total blackout.</p>
+        <p><strong>Response:</strong> Immediately escalate to the Node operator's local network engineering team to inspect edge router stability, outbound connection limits, and CPU utilization of the publishing daemon.</p>
+      </div>
+
+      <!-- 3.2 -->
+      <div id="sec3-2">
+        <h3>3.2 Total Isolation and Endpoint Failure</h3>
+
+        <h4>"Disconnected WIS2 Node from all Global Brokers" — <span class="sev-badge sev-badge-critical">CRITICAL</span></h4>
+        <p><strong>Trigger:</strong> Global Monitor registers absolute silence from the Node; zero active MQTT connections across the entire Global Broker mesh.</p>
+        <p><strong>Technical causes:</strong> Catastrophic failures — total facility power loss, complete physical isolation from ISPs, expiration of top-level TLS certificates, or fatal runtime crashes within the messaging software (e.g. <strong>wis2box</strong>).</p>
+        <p><strong>Impact:</strong> Absolute — no WNMs can be published; the global community remains entirely unaware of any new meteorological data generated by the Node, effectively erasing its real-time scientific contribution.</p>
+        <p><strong>Response:</strong> Immediate out-of-band communication with the Node administrator; emergency restarts; physical verification of core internet connectivity.</p>
+
+        <h4>"Target is down" — <span class="sev-badge sev-badge-critical">CRITICAL</span></h4>
+        <p><strong>Example targets:</strong> <code>wis2.ncm.gov.sa:443</code>, <code>www.wis-jma.go.jp:443</code></p>
+        <p><strong>Trigger:</strong> Active health checks (HTTP GET requests or ICMP pings) fail to receive any response.</p>
+        <p><strong>Technical causes:</strong> Reverse proxy crashes (e.g. Nginx or HAProxy), DDoS mitigation hardware aggressively blackholing traffic, or total server hardware failure.</p>
+        <p><strong>Impact:</strong> Extends beyond notification failure — the endpoint hosting the actual data payload or metadata services is completely inaccessible.</p>
+        <p><strong>Response:</strong> Local system administrators verify edge load balancers, web server daemons, and physical server availability.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 4: GLOBAL CACHE & DATA FLOW DISRUPTIONS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="sec4">
+      <div class="cat-section-header">
+        <div class="cat-section-icon cache">&#9670;</div>
+        <h2>4. Global Cache &amp; Data Flow Disruptions</h2>
+      </div>
+
+      <p>While Global Brokers manage the signaling and notification pathways, Global Caches are responsible for the heavy lifting of payload distribution. When a WNM announces new data, Global Caches download the data payload from the origin WIS2 Node's HTTP server and cache it locally. End-users then download data from the Cache, shielding the origin Node from overwhelming concurrent bandwidth requests.</p>
+
+      <p>Anomalies in this domain signify a critical breakdown between the notification phase and the actual data retrieval phase — data is announced but physically unobtainable.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Event Title</th><th>Severity</th><th>Event Type</th><th>Core System Impact</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>No cache is receiving data from that center over the last 6 hours</td>
+            <td><span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td><code>int.wmo.wis.wme.event.item.download</code></td>
+            <td>Global "ghosting" effect; data announced but inaccessible.</td>
+          </tr>
+          <tr>
+            <td>No data is received from that center over the last 6 hours</td>
+            <td><span class="sev-badge sev-badge-warning">WARNING</span></td>
+            <td><code>int.wmo.wis.wme.event.item.download</code></td>
+            <td>Potential localized cache failure or slow data production.</td>
+          </tr>
+          <tr>
+            <td>The Global cache is not receiving any data since 1 hour</td>
+            <td><span class="sev-badge sev-badge-critical">CRITICAL</span></td>
+            <td><code>int.wmo.wis.wme.event.item.download</code></td>
+            <td>Cache-wide ingestion failure; broad data staleness.</td>
+          </tr>
+          <tr>
+            <td>Global cache has &gt; 10 download errors from center in 1h over 6h</td>
+            <td><span class="sev-badge sev-badge-warning">WARNING</span>/<span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td><code>int.wmo.wis.wme.event.item.download</code></td>
+            <td>High friction data fetching; partial payload loss.</td>
+          </tr>
+          <tr>
+            <td>Global Cache cannot connect to &gt; 10 (or 20) dataservers</td>
+            <td><span class="sev-badge sev-badge-error">ERROR</span>/<span class="sev-badge sev-badge-critical">CRITICAL</span></td>
+            <td><code>int.wmo.wis.wme.event.item.download</code></td>
+            <td>Cache egress failure; inability to populate cache inventory.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 4.1 -->
+      <div id="sec4-1">
+        <h3>4.1 Ingestion Failures and the "Ghosting" Phenomenon</h3>
+
+        <h4>"No cache is receiving data from that center over the last 6 hours" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Trigger:</strong> Time-series aggregation confirming that for a continuous six-hour window, WNMs are being successfully published by the origin Node, but zero bytes of the associated payload data have been successfully ingested by any Global Cache.</p>
+        <p><strong>Technical causes:</strong> The origin Node publishes valid MQTT notifications, but the canonical HTTP links embedded within those WNMs point to an inaccessible data server — hidden behind a private NAT firewall, DNS misconfigured or not propagated globally, or the HTTP daemon serving physical files has crashed while the MQTT publishing script continues to run.</p>
+        <p><strong>Impact:</strong> Severe "ghosting" — automated subscriber pipelines receive notifications of new weather data, but subsequent programmatic download attempts encounter dead links, rendering data entirely inaccessible and causing widespread script timeouts.</p>
+        <p><strong>Response:</strong> Node operator verifies HTTP/HTTPS reachability of the canonical URL from external, global networks.</p>
+
+        <h4>"The Global cache is not receiving any data since 1 hour" — <span class="sev-badge sev-badge-critical">CRITICAL</span></h4>
+        <p><strong>Trigger:</strong> A specific Global Cache reports a sudden, absolute drop in its overall incoming data ingestion rate across all global centers for sixty consecutive minutes.</p>
+        <p><strong>Technical causes:</strong> Exhausted disk space on the Cache's storage arrays; out-of-memory (OOM) errors killing worker processes; or the Cache's outbound IP block inadvertently blacklisted by origin centers due to aggressive polling.</p>
+        <p><strong>Impact:</strong> Massive — end-users relying on this Cache receive increasingly stale data or encounter HTTP 500/503 errors.</p>
+        <p><strong>Response:</strong> Cache operators check storage metrics, restart worker nodes, inspect networking for packet loss.</p>
+      </div>
+
+      <!-- 4.2 -->
+      <div id="sec4-2">
+        <h3>4.2 Friction and Rate Limiting Anomalies</h3>
+
+        <h4>"Global cache has &gt; 10 download errors from center in 1h over 6h" — <span class="sev-badge sev-badge-warning">WARNING</span>/<span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Severity fluctuates</strong> between WARNING and ERROR depending on the breadth of Caches affected.</p>
+        <p><strong>Trigger:</strong> Rolling window function detects persistent, repeating HTTP 4xx or 5xx error codes when Caches attempt to fetch data payloads from a specific Node's data server.</p>
+        <p><strong>Technical causes (multifaceted):</strong></p>
+        <ul style="margin:8px 0 16px 20px; font-size:13.5px; color:var(--text-secondary); line-height:1.7;">
+          <li>Node's data server applying overly aggressive rate-limiting → HTTP <strong>429 Too Many Requests</strong></li>
+          <li>Node's server under-resourced, experiencing intermittent gateway timeouts (HTTP <strong>504</strong>)</li>
+          <li>Rapid data deprecation — Cache receives HTTP <strong>404 Not Found</strong> because physical data files are deleted by local cleanup scripts faster than Caches can retrieve them</li>
+        </ul>
+        <p><strong>Impact:</strong> Partial data loss and high latency. A significant percentage of data is permanently lost during error windows, leading to fragmented meteorological datasets downstream.</p>
+        <p><strong>Response:</strong> Origin Node operator tunes web server rate-limiting logic, scales HTTP server resources, or extends data file persistence windows.</p>
+
+        <h4>"Global Cache cannot connect to &gt; 10 (or 20) dataservers" — <span class="sev-badge sev-badge-error">ERROR</span>/<span class="sev-badge sev-badge-critical">CRITICAL</span></h4>
+        <p><strong>Trigger:</strong> Aggregated HTTP connection failures (timeouts, connection refused). The escalation to 20 dataservers triggers CRITICAL.</p>
+        <p><strong>Technical causes:</strong> Compromised network egress at the Cache facility — upstream ISP throttling, internal DNS resolution failures, or an overloaded outbound NAT gateway exhausting ephemeral ports.</p>
+        <p><strong>Response:</strong> Immediate investigation of the Cache's internal DNS resolvers and outbound routing appliances.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 5: PROTOCOL, ENDPOINT & NETWORK LAYER TERMINATIONS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="sec5">
+      <div class="cat-section-header">
+        <div class="cat-section-icon proto">&#9889;</div>
+        <h2>5. Protocol, Endpoint &amp; Network Layer Terminations</h2>
+      </div>
+
+      <p>Beneath the architectural logic of Caches and Brokers lies the fundamental network layer. Monitoring agents continually scrape Global Services for performance telemetry using tools like Prometheus. When the foundational protocols fail, the observability plane goes blind.</p>
+
+      <!-- 5.1 -->
+      <div id="sec5-1">
+        <h3>5.1 Connection Timeouts and Deadlines</h3>
+
+        <h4>"Timeout: context deadline exceeded" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Observed targets:</strong> <code>globalbroker.inmet.gov.br</code>, <code>wis2.ncm.gov.sa</code>, <code>wis2-gdc.weather.gc.ca</code></p>
+        <p><strong>Trigger:</strong> Global Monitor initiates an HTTP GET request (often targeting a <code>/metrics</code> or <code>/prometheus/federate</code> endpoint), but the TCP connection or HTTP response is not completed within the strict timeout window defined by the application's Golang <code>context.Context</code> deadline.</p>
+        <p><strong>Technical causes:</strong> Resource exhaustion — extreme CPU load causing application threads to stall; backend database locking (e.g. PostgreSQL or Elasticsearch) delaying metrics payload assembly; or a stateful firewall silently dropping packets without returning a TCP RST flag.</p>
+        <p><strong>Impact:</strong> Insidious — while actual meteorological data flow and MQTT routing may still function normally, the monitoring plane is effectively blinded. This raises the critical risk of silent, cascading failures occurring without operator awareness.</p>
+        <p><strong>Response:</strong> Monitoring engineers temporarily increase timeout thresholds; target operators optimize computational performance of <code>/metrics</code> endpoints and investigate CPU load averages.</p>
+      </div>
+
+      <!-- 5.2 -->
+      <div id="sec5-2">
+        <h3>5.2 Abrupt Terminations and Access Denials</h3>
+
+        <h4>"Network Termination: unexpected EOF" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Observed target:</strong> <code>gc.wis.cma.cn</code></p>
+        <p><strong>Trigger:</strong> The underlying TCP connection is abruptly severed by the remote server before the complete HTTP payload is transmitted.</p>
+        <p><strong>Technical causes:</strong> Reverse proxy crashed mid-stream due to a segmentation fault; upstream load balancer prematurely killed the connection due to aggressive keep-alive timeouts; or TLS session renegotiation failed, dropping the socket.</p>
+        <p><strong>Impact:</strong> Metric loss and potential instability in actual data fetching, particularly if the same reverse proxy handles both telemetry requests and WNM payload downloads.</p>
+        <p><strong>Response:</strong> Target administrators inspect web server error logs for application panics and review proxy timeout configurations.</p>
+
+        <h4>"HTTP Error: 403 Forbidden" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Observed target:</strong> <code>www.wis-jma.go.jp</code></p>
+        <p><strong>Trigger:</strong> The target server explicitly returns an HTTP 403 status code — successful network connection but deliberate rejection by the application layer.</p>
+        <p><strong>Technical causes:</strong> A Web Application Firewall (WAF) falsely identifying the Global Monitor's User-Agent string or polling frequency as malicious; or incorrectly applied CORS policies.</p>
+        <p><strong>Response:</strong> Target operator updates WAF Access Control Lists (ACLs) to explicitly whitelist known IP ranges of WIS2 Global Monitors.</p>
+
+        <h4>"HTTP Error: 502 Bad Gateway" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p>The upstream server returned an invalid response, typically indicating the reverse proxy or load balancer cannot reach the backend application.</p>
+
+        <h4>"Connection Refused" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p>The target server actively rejected the TCP connection, typically indicating the service is not running or the port is not open.</p>
+
+        <h4>"Network Termination: connection reset by peer" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p>The remote server forcibly closed the TCP connection, often indicating an application crash or resource exhaustion.</p>
+
+        <h4>"Timeout: i/o timeout" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p>A network-level I/O timeout, indicating packets are not being acknowledged within the expected timeframe.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 6: SCHEMA AND METADATA VALIDATION INTEGRITY -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="sec6">
+      <div class="cat-section-header">
+        <div class="cat-section-icon schema">&#10003;</div>
+        <h2>6. Schema &amp; Metadata Validation Integrity</h2>
+      </div>
+
+      <p>The operational success of WIS2 relies not just on moving bytes from point A to point B, but on ensuring those bytes are universally comprehensible and discoverable. Data discoverability is strictly governed by compliance with the WMO Core Metadata Profile (WCMP2) and the structural integrity of the WNM schema.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Event Title</th><th>Severity</th><th>Event Type</th><th>Core System Impact</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>WIS2 Notification Message not compliant with the defined schema</td>
+            <td><span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td><code>int.wmo.wis.wme.wnm.validation.schema</code></td>
+            <td>Message quarantine; downstream schema parsing panics.</td>
+          </tr>
+          <tr>
+            <td>Missing Metadata record for data announced in WNM</td>
+            <td><span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td><code>int.wmo.wis.wme.wnm.validation.metadata</code></td>
+            <td>Data is "dark" and completely undiscoverable via GDC.</td>
+          </tr>
+          <tr>
+            <td>WCMP2 Access Failure</td>
+            <td><span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td><code>int.wmo.wis.wme.event</code></td>
+            <td>GDC cannot retrieve mandatory discovery records.</td>
+          </tr>
+          <tr>
+            <td>WCMP2 ETS Report (Schema constraint failures)</td>
+            <td><span class="sev-badge sev-badge-info">INFO</span>/<span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td><code>int.wmo.wis.wme.event.wcmp2.ets</code></td>
+            <td>Rejection of non-compliant metadata by catalogues.</td>
+          </tr>
+          <tr>
+            <td>WCMP2 KPI Report Degradation</td>
+            <td><span class="sev-badge sev-badge-warning">WARNING</span></td>
+            <td><code>int.wmo.wis.wme.event.wcmp2.kpi</code></td>
+            <td>Severe penalization in global search rankings.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 6.1 -->
+      <div id="sec6-1">
+        <h3>6.1 Payload and Structural Validation</h3>
+
+        <h4>"WIS2 Notification Message not compliant with the defined schema" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Trigger:</strong> Global Broker or monitoring tool evaluates the JSON payload against the normative <code>wis2-notification-message-bundled.json</code> schema and detects a structural violation.</p>
+        <p><strong>Empirical example:</strong> <code>data.field properties.content.size</code> exceeds its configured maximum limit (e.g. "should be &lt;= 4096").</p>
+        <p><strong>Technical causes:</strong> Software bugs in the Node's message generation logic; manual formatting errors; or failures to correctly escape complex JSON strings before transmission.</p>
+        <p><strong>Impact:</strong> Immediate and systemic — Global Brokers may quarantine or drop the malformed message. Downstream subscribers executing strict parsing will experience fatal application crashes on deserialization.</p>
+        <p><strong>Response:</strong> Node developers leverage <strong>pywis-pubsub</strong> or <strong>check-jsonschema</strong> to pre-validate payloads locally before MQTT publication.</p>
+      </div>
+
+      <!-- 6.2 -->
+      <div id="sec6-2">
+        <h3>6.2 The Discoverability and "Dark Data" Threat</h3>
+
+        <h4>"Missing Metadata record for data announced in WNM" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Trigger:</strong> Global Broker receives a WNM containing a specific <code>metadata_id</code> (e.g. <code>urn:wmo:md:uk-metoffice-wmc:weather.prediction...</code>), but cross-referencing with the GDC reveals the record does not exist.</p>
+        <p><strong>Technical causes:</strong> Asynchronous workflows — Node operators deploy new data pipelines and configure MQTT publishers but neglect to publish the accompanying WCMP2 discovery record. Alternatively, the GDC rejected the record during its own ingestion validation.</p>
+        <p><strong>Impact:</strong> Generation of "dark data" — subscribers on the specific topic receive the data, but no new end-users or researchers can discover it via GDC. This violates core WIS2 discovery principles.</p>
+        <p><strong>Response:</strong> Node operator immediately generates a compliant WCMP2 record with the exact <code>metadata_id</code> referenced in the WNM and pushes it to the catalog.</p>
+
+        <h4>"WCMP2 Access Failure" — <span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p><strong>Trigger:</strong> GDC attempts to fetch a referenced metadata record and encounters HTTP 404 Not Found.</p>
+        <p><strong>Technical causes:</strong> Metadata endpoint URL changed without notice, file accidentally deleted, or directory permissions improperly modified.</p>
+        <p><strong>Response:</strong> Operators immediately restore the WCMP2 JSON file to the correct URI path.</p>
+      </div>
+
+      <!-- 6.3 -->
+      <div id="sec6-3">
+        <h3>6.3 Executable Test Suites and Quality Scoring</h3>
+
+        <h4>"WCMP2 ETS Report" — <span class="sev-badge sev-badge-info">INFO</span>/<span class="sev-badge sev-badge-error">ERROR</span></h4>
+        <p>GDCs deploy automated <strong>Executable Test Suites (ETS)</strong> for routine evaluation of published WCMP2 records. Results are emitted as INFO telemetry (escalating to ERROR for failures), providing a granular JSON-formatted array of passed and failed constraints.</p>
+        <p><strong>ETS evaluates:</strong> Strict adherence to geospatial bounding box formatting, temporal ISO 8601 syntax, and inclusion of mandatory data policy links.</p>
+        <p><strong>Impact:</strong> If ETS evaluation results in a FAILED code, the GDC outright refuses to ingest the record, rendering the associated data undiscoverable.</p>
+        <p><strong>Response:</strong> Node operators review the specific failed schema constraints and republish the corrected record.</p>
+
+        <h4>"WCMP2 KPI Report Degradation" — <span class="sev-badge sev-badge-warning">WARNING</span></h4>
+        <p><strong>Event type:</strong> <code>int.wmo.wis.wme.event.wcmp2.kpi</code></p>
+        <p><strong>Key Performance Indicators (KPIs)</strong> assess the qualitative value of metadata — evaluating the depth and descriptiveness of abstracts, precision of spatial bounding boxes, and completeness of temporal coverage.</p>
+        <p>If a record passes ETS but scores poorly on the KPI index, a WARNING event is generated. The data is technically valid, but its discoverability ranking in GDC search algorithms will be heavily penalized until the descriptive metadata is enriched.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 7: SYSTEMIC TELEMETRY -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="sec7">
+      <div class="cat-section-header">
+        <div class="cat-section-icon system">&#9881;</div>
+        <h2>7. Systemic Telemetry: Lifecycle Notices &amp; Latent Threats</h2>
+      </div>
+
+      <p>A holistic observability framework does not solely track failures; it must also account for administrative events and theoretical threats outlined within the architecture's foundational documentation.</p>
+
+      <!-- 7.1 -->
+      <div id="sec7-1">
+        <h3>7.1 Scheduled Maintenance and Administrative Silencing</h3>
+        <p><strong>Example alerts:</strong> "A scheduled maintenance service for CMA Global Monitor", "Maintenance Service for CMA Global Broker"</p>
+        <p>Though technically administrative notices, these are frequently flagged with <span class="sev-badge sev-badge-critical">CRITICAL</span> severity because they dictate the total (albeit planned) unavailability of a core system component.</p>
+        <p><strong>Event type:</strong> <code>int.wmo.wis.wme.event.notice</code></p>
+        <p><strong>Technical causes:</strong> SSL certificate rotations, physical infrastructure migrations, emergency hardware upgrades, and significant software transitions (e.g. upgrading a Global Broker's engine to support MQTT v5.0).</p>
+        <p><strong>Impact:</strong> Strictly temporary but highly disruptive if unmanaged. The architecture's redundancy ensures alternative brokers absorb traffic during broker maintenance.</p>
+        <p><strong>Response:</strong> Subscribers relying on a specific Node undergoing maintenance must pause ingestion pipelines or engage failover scripts to source data from alternative regional providers.</p>
+      </div>
+
+      <!-- 7.2 -->
+      <div id="sec7-2">
+        <h3>7.2 Broker Routing Integrity and Anti-Loop Detection</h3>
+        <p>Global Brokers are mandated to subscribe to each other to ensure redundant and reliable transmission. However, this interconnected mesh introduces the risk of infinite message loops.</p>
+
+        <div class="cat-callout critical">
+          <div class="cat-callout-title">Theorized Alert: Anti-Loop Threshold Exceeded</div>
+          <p><strong>Severity:</strong> <span class="sev-badge sev-badge-warning">WARNING</span> or <span class="sev-badge sev-badge-error">ERROR</span></p>
+          <p><strong>Trigger:</strong> Duplicate detection heuristic flags an exceptionally high rate of identical UUIDs within a sub-second timeframe.</p>
+          <p><strong>Technical cause:</strong> Failure in the routing logic or a malfunctioning Node entering an infinite retry loop.</p>
+          <p><strong>Systemic impact if unchecked:</strong> Catastrophic — exponential network bandwidth consumption, broker CPU exhaustion, and the eventual crash of the entire PubSub mesh.</p>
+          <p><strong>Response:</strong> Monitoring agents must immediately quarantine the offending Node's topic stream.</p>
+        </div>
+
+        <p>Brokers implement an Anti-loop mechanism that tracks message UUIDs and suppresses duplicates.</p>
+      </div>
+
+      <!-- 7.3 -->
+      <div id="sec7-3">
+        <h3>7.3 Global Discovery Catalogue Latency</h3>
+
+        <div class="cat-callout warning">
+          <div class="cat-callout-title">Theorized Alert: GDC Metadata Archive Stale (&gt; 24 Hours)</div>
+          <p><strong>Severity:</strong> <span class="sev-badge sev-badge-warning">WARNING</span> or <span class="sev-badge sev-badge-error">ERROR</span></p>
+          <p><strong>Trigger:</strong> A GDC's internal synchronization process (e.g. a scheduled harvester pulling records via OGC API endpoints) fails to update its index for a full day.</p>
+          <p><strong>Technical causes:</strong> Backend database hanging (locked indexing queue) or harvester scripts crashing silently.</p>
+          <p><strong>Systemic impact:</strong> The GDC becomes entirely "stale." Users querying the catalogue receive outdated or null results, directly undermining the WIS2 principle of rapid global data discovery.</p>
+          <p><strong>Response:</strong> GDC administrators manually force index rebuilds and inspect harvester application logs.</p>
+        </div>
+      </div>
+
+      <!-- 7.4 -->
+      <div id="sec7-4">
+        <h3>7.4 The Sensor Centre Paradigm and Performance Thresholds</h3>
+        <p>The most advanced aspect of the WIS2 observability framework. Spearheaded by the WMO's <strong>Expert Team on WIS2 Implementation and Transition (ET-W2IT)</strong>, Sensor Centres act as independent, objective auditing entities distributed across multiple WMO Regions.</p>
+
+        <p><strong>Specific deployments:</strong></p>
+        <ul style="margin:8px 0 16px 20px; font-size:13.5px; color:var(--text-secondary); line-height:1.7;">
+          <li><strong>Sensor Centre Global Broker (SCGB)</strong></li>
+          <li><strong>Sensor Centre Global Cache (SCGC)</strong></li>
+          <li><strong>Sensor Centre Global Discovery Catalogue (SCGDC)</strong></li>
+        </ul>
+
+        <p>These Sensor Centres are designed to generate WME alerts when operational <strong>Key Performance Indicators (KPIs)</strong> and <strong>Service Level Agreements (SLAs)</strong> are breached.</p>
+
+        <div class="cat-callout critical">
+          <div class="cat-callout-title">Example: Global Broker KPI Breach</div>
+          <p>If a Global Broker fails to meet the architectural requirement of processing a minimum of <strong>10,000 messages per second</strong>, or if its subscriber capacity breaches <strong>1,000 active connections</strong> without dynamically scaling, the Sensor Centre's localized OpenMetrics and <strong>Prometheus AlertManager</strong> scripts will independently generate and push a <span class="sev-badge sev-badge-critical">CRITICAL</span> WME alert to the global network.</p>
+        </div>
+
+        <p><strong>Technical cause:</strong> Pure computational or bandwidth exhaustion at the target Global Service facility.</p>
+        <p><strong>Systemic impact:</strong> Allows for proactive identification of service degradation long before it cascades into outright failure or total broker disconnection. Provides the global monitoring community with undeniable, objective telemetry to enforce operational standards.</p>
+        <p><strong>Extensibility:</strong> Regional authorities can deploy bespoke Sensor Centres to validate local regulatory compliance (e.g. GBON or RBON data flow), integrating their findings seamlessly into the overarching WME alerting topic.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 8: ACTIONABLE RESPONSE FRAMEWORK -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="sec8">
+      <div class="cat-section-header">
+        <div class="cat-section-icon resp">&#9654;</div>
+        <h2>8. Actionable Response Framework</h2>
+      </div>
+
+      <p>The ultimate value of the WME specification is not merely in the generation of complex JSON payloads, but in the operationalization of that telemetry into rapid incident response. Monitoring agents, Global Information System Centres (GISCs), and local Node operators must adhere to a strict response matrix governed by <code>data.severity</code>.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Severity</th><th>Threat Profile &amp; Example Alerts</th><th>Immediate Technical Action</th><th>Escalation &amp; Remediation</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="sev-badge sev-badge-info">DEBUG / INFO</span></td>
+            <td>Non-disruptive. Routine telemetry (WCMP2 ETS Passed, standard heartbeats).</td>
+            <td>No manual intervention.</td>
+            <td>Ingest to time-series databases for long-term SLA reporting. Used by Sensor Centres to tune KPI algorithms and adjust baseline anomaly detection thresholds.</td>
+          </tr>
+          <tr>
+            <td><span class="sev-badge sev-badge-warning">WARNING</span></td>
+            <td>Degradation of redundancy or creeping friction (Disconnected from one Global Broker, KPI score dipping).</td>
+            <td>Trigger automated localized network diagnostics (traceroute, ping). Verify local TLS certificates.</td>
+            <td>Log a non-urgent ticket for next-business-day review. Investigate underlying ISP jitter or minor JSON metadata omissions.</td>
+          </tr>
+          <tr>
+            <td><span class="sev-badge sev-badge-error">ERROR</span></td>
+            <td>Isolated failure affecting specific data sets (WNM schema failure, 403 Forbidden, Missing Metadata).</td>
+            <td>Quarantine the malformed payload. Suspend downstream fetching from the failing center. Alert data provider immediately.</td>
+            <td>Require manual schema correction (<code>check-jsonschema</code>) or WAF ACL whitelisting before unblocking.</td>
+          </tr>
+          <tr>
+            <td><span class="sev-badge sev-badge-critical">CRITICAL</span></td>
+            <td>Systemic or total blackout (Disconnected from all brokers, Cache 0 bytes ingested, Node target Down).</td>
+            <td>Engage emergency fallback. Reroute subscriber scripts to regional backup Caches and alternative brokers. Page standby operations engineers.</td>
+            <td>Escalate to hardware/ISP level. Extensive postmortem analysis required upon restoration.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 9: CONCLUSION -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="conclusion">
+      <div class="cat-section-header">
+        <div class="cat-section-icon arch">&#10003;</div>
+        <h2>9. Conclusion</h2>
+      </div>
+
+      <p>The WIS2 Monitoring Events (WME) framework represents a highly sophisticated, CloudEvents-driven observability layer that is indispensable for the maintenance and scalability of global meteorological data exchange. The architectural transition from static file transfers to a dynamic, asynchronous PubSub mesh introduces immense complexity — while it decouples producers and consumers, it simultaneously introduces the risk of silent, localized failures that can rapidly cascade into global data blackouts.</p>
+
+      <p>WIS2 alerts provide unparalleled, granular diagnostics — ranging from the detection of critical physical infrastructure failures (Node disconnections, HTTP target timeouts) to nuanced, deep-packet inspections of JSON schema violations and metadata non-compliance.</p>
+
+      <p>The WMO's forward-looking integration of independent Sensor Centres and automated Executable Test Suites ensures a continuous, objective audit of the network's health. This guarantees that not only is the uptime of the physical network relentlessly tracked, but the integrity, compliance, and ultimate scientific discoverability of the meteorological data itself remain entirely uncompromised.</p>
+
+      <p>For infrastructure operators and monitoring agents, the continuous ingestion, automated parsing, and rapid operationalization of these WME alerts are paramount to securing the fault-tolerant future of the WMO Information System 2.0.</p>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: ALERT FIELDS - CORE -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="alert-fields">
+      <div class="cat-section-header">
+        <div class="cat-section-icon field">&#9998;</div>
+        <h2>Core Alert Fields</h2>
+      </div>
+      <p class="cat-section-desc">These fields appear on every alert record and are used across the dashboard, monitor list, and detail views.</p>
+
+      <div class="field-card">
+        <div class="field-card-name">id</div>
+        <div class="field-card-type">UUID (Primary Key)</div>
+        <div class="field-card-desc">Unique identifier assigned by the WIS2 Monitoring Event (WME) system. Used to link alerts across the platform and to access the detail page.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">severity</div>
+        <div class="field-card-type">String — CRITICAL | ERROR | WARNING | INFO</div>
+        <div class="field-card-desc">Urgency level of the alert. Determines the color coding across the UI and the priority of the issue. See <a href="#severity" style="color:var(--accent)">Severity Levels</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">event_type</div>
+        <div class="field-card-type">String (URI)</div>
+        <div class="field-card-desc">The WME event type URI identifying the class of monitoring event. Displayed as the last two segments (e.g. <code>wme event</code>). See <a href="#event-types" style="color:var(--accent)">Event Types</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">title</div>
+        <div class="field-card-type">Text (nullable)</div>
+        <div class="field-card-desc">The original alert title from the WME content payload (e.g. <code>Disconnected WIS2 Node uk-metoffice-wmc</code>).</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">description</div>
+        <div class="field-card-type">Text (nullable)</div>
+        <div class="field-card-desc">Full text description from the WME content. May contain technical details such as error messages, stack traces, or diagnostic information.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">event_time</div>
+        <div class="field-card-type">DateTime (UTC)</div>
+        <div class="field-card-desc">When the WIS2 event occurred. Primary timestamp used for sorting and time-based filtering.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">ingested_at</div>
+        <div class="field-card-type">DateTime (auto-set)</div>
+        <div class="field-card-desc">Timestamp when this alert record was ingested into the local database. Used as the default sort order and for live-feed polling.</div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: IDENTIFIERS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="alert-ids">
+      <div class="cat-section-header">
+        <div class="cat-section-icon field">&#9998;</div>
+        <h2>Identifiers &amp; Classification</h2>
+      </div>
+
+      <div class="field-card">
+        <div class="field-card-name">node</div>
+        <div class="field-card-type">String (FK to nodes table)</div>
+        <div class="field-card-desc">The WIS2 node this alert pertains to, derived from the WME <code>subject</code> field (e.g. <code>uk-metoffice-wmc</code>, <code>cn-cma-global-monitor</code>). Used for node-based filtering and RBAC.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">source</div>
+        <div class="field-card-type">String</div>
+        <div class="field-card-desc">The WME source identifier — the monitoring service that generated this alert (e.g. <code>cn-cma-global-monitor</code>, <code>us-noaa-global-broker</code>). Different from <code>node</code>: the source is the observer, the node is the observed.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">category</div>
+        <div class="field-card-type">Text (computed, nullable)</div>
+        <div class="field-card-desc">Automatically computed during ingestion based on title/description pattern matching. See <a href="#categories" style="color:var(--accent)">Categories</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">display_title</div>
+        <div class="field-card-type">Text (computed, nullable)</div>
+        <div class="field-card-desc">A clean, human-readable title computed during ingestion by normalizing common patterns. See <a href="#display-titles" style="color:var(--accent)">Display Titles</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">subtype</div>
+        <div class="field-card-type">String (nullable)</div>
+        <div class="field-card-desc">Optional sub-classification. The only observed value is <code>gm-alert</code>, used for Global Monitor alert notifications.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">channel</div>
+        <div class="field-card-type">Text (nullable)</div>
+        <div class="field-card-desc">The WIS2 data channel from which the notification originated (e.g. <code>origin/a/wis2/de-dwd/data/core</code>).</div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: METADATA FIELDS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="alert-meta">
+      <div class="cat-section-header">
+        <div class="cat-section-icon field">&#9998;</div>
+        <h2>Metadata Fields</h2>
+      </div>
+      <p class="cat-section-desc">Technical metadata from the WME envelope and WIS2 specification conformance.</p>
+
+      <div class="field-card">
+        <div class="field-card-name">specversion</div>
+        <div class="field-card-type">String (max 10 chars)</div>
+        <div class="field-card-desc">The WIS2 specification version this message conforms to (e.g. <code>1.0</code>).</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">datacontenttype</div>
+        <div class="field-card-type">String</div>
+        <div class="field-card-desc">MIME type of the data payload (e.g. <code>application/json</code>).</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">dataschema</div>
+        <div class="field-card-type">Text (nullable)</div>
+        <div class="field-card-desc">URL of the JSON schema that the message content conforms to.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">conforms_to</div>
+        <div class="field-card-type">JSON Array (nullable)</div>
+        <div class="field-card-desc">List of WIS2 specification conformance URIs (e.g. <code>http://wis.wmo.int/spec/wme/1/conf/monitoring-event-message-core</code>).</div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: CONTENT FIELDS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="alert-content">
+      <div class="cat-section-header">
+        <div class="cat-section-icon field">&#9998;</div>
+        <h2>Content Fields</h2>
+      </div>
+      <p class="cat-section-desc">These fields contain the structured data payload of the alert, parsed from the WME <code>data.content</code> object.</p>
+
+      <div class="field-card">
+        <div class="field-card-name">wnm</div>
+        <div class="field-card-type">JSON Object (nullable)</div>
+        <div class="field-card-desc">The WNM payload — a GeoJSON Feature object containing the notification details. See <a href="#wnm" style="color:var(--accent)">WNM Payload</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">errors</div>
+        <div class="field-card-type">JSON Array (nullable)</div>
+        <div class="field-card-desc">List of error objects or strings from the WME content. See <a href="#errors" style="color:var(--accent)">Errors</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">tests</div>
+        <div class="field-card-type">JSON Array (nullable)</div>
+        <div class="field-card-desc">List of ETS test results. Each entry has an id, status, and message. See <a href="#tests" style="color:var(--accent)">Tests (ETS)</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">summary</div>
+        <div class="field-card-type">JSON Object (nullable)</div>
+        <div class="field-card-desc">Aggregated test result counts. See <a href="#summary" style="color:var(--accent)">Summary</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">links</div>
+        <div class="field-card-type">JSON Array (nullable)</div>
+        <div class="field-card-desc">Array of link objects referencing related resources. See <a href="#links" style="color:var(--accent)">Links</a>.</div>
+      </div>
+      <div class="field-card">
+        <div class="field-card-name">incident_hash</div>
+        <div class="field-card-type">Text (computed, nullable)</div>
+        <div class="field-card-desc">SHA-256 hash of <code>"{title}:{node}"</code>. Alerts sharing the same title and node are grouped into the same incident. See <a href="#incidents" style="color:var(--accent)">Incidents</a>.</div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: WNM PAYLOAD -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="wnm">
+      <div class="cat-section-header">
+        <div class="cat-section-icon wnm">&#9670;</div>
+        <h2>WNM Payload Structure</h2>
+      </div>
+      <p class="cat-section-desc">The WIS2 Notification Message (WNM) is a GeoJSON Feature object encoded per the WMO WNM specification.</p>
+
+      <div class="cat-callout accent">
+        <div class="cat-callout-title">Specification</div>
+        <p>Defined in <code>Manual on WIS, Volume II — Appendix E. WIS2 Notification Message</code>. Encoded as GeoJSON (RFC 7946) and published as MQP payloads on WIS2 brokers.</p>
+      </div>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Field Path</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>UUID</td><td>Unique message identifier. Guarantees uniqueness over at least a 24-hour period.</td></tr>
+          <tr><td><code>type</code></td><td>String</td><td>GeoJSON type. Always <code>Feature</code>.</td></tr>
+          <tr><td><code>geometry</code></td><td>GeoJSON Geometry | null</td><td>Geographic location of the data — Point or Polygon. May be null.</td></tr>
+          <tr><td><code>conformsTo</code></td><td>Array of strings</td><td>Specification conformance URIs (e.g. <code>http://wis.wmo.int/spec/wnm/1/conf/core</code>).</td></tr>
+          <tr><td><code>links</code></td><td>Array of link objects</td><td>References to related resources.</td></tr>
+          <tr><td><code>properties.pubtime</code></td><td>DateTime (RFC 3339)</td><td>When the file was posted/published. Critical for tracking message lag.</td></tr>
+          <tr><td><code>properties.data_id</code></td><td>String</td><td>Unique identifier of the data as defined by the producer. Used for deduplication.</td></tr>
+          <tr><td><code>properties.datetime</code></td><td>DateTime | null</td><td>The observation datetime of the data being published.</td></tr>
+          <tr><td><code>properties.start_datetime</code></td><td>DateTime</td><td>Start of the data time range.</td></tr>
+          <tr><td><code>properties.end_datetime</code></td><td>DateTime</td><td>End of the data time range.</td></tr>
+          <tr><td><code>properties.metadata_id</code></td><td>String</td><td>WCMP2 metadata record identifier from the WIS2 Global Discovery Catalogue.</td></tr>
+          <tr><td><code>properties.cache</code></td><td>Boolean</td><td>Whether the data should be cached. Default: <code>true</code>.</td></tr>
+          <tr><td><code>properties.integrity</code></td><td>Object</td><td>Data integrity checksum. Contains <code>method</code> (e.g. <code>sha256</code>) and <code>value</code> (base64-encoded).</td></tr>
+          <tr><td><code>properties.content</code></td><td>Object</td><td>Inline data content. Contains <code>encoding</code>, <code>size</code> (bytes, max 4096), and <code>value</code>.</td></tr>
+          <tr><td><code>properties.timestep</code></td><td>String</td><td>Timestep indicator (e.g. <code>T+120</code>). Forecast lead time.</td></tr>
+          <tr><td><code>properties.gts</code></td><td>Object</td><td>GTS metadata. Contains <code>cccc</code> (centre code) and <code>ttaaii</code> (bulletin identifier).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: ERRORS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="errors">
+      <div class="cat-section-header">
+        <div class="cat-section-icon error">&#10005;</div>
+        <h2>Errors</h2>
+      </div>
+      <p class="cat-section-desc">The <code>errors</code> field contains a JSON array of error objects or strings describing technical failures.</p>
+
+      <h3>String Errors</h3>
+      <p class="cat-section-desc">A plain string describing the error (e.g. <code>"unexpected EOF, collection time 2026-06-18T05:36:35Z"</code>).</p>
+
+      <h3>Object Errors</h3>
+      <p class="cat-section-desc">A key-value object where each key is an error detail label and each value is either a string or an array of strings.</p>
+      <table class="cat-table">
+        <thead>
+          <tr><th>Key</th><th>Value Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>(any label)</code></td><td>String</td><td>A single error detail message.</td></tr>
+          <tr><td><code>(any label)</code></td><td>Array of strings</td><td>A list of error detail values. Truncated to 5 items with <code>...</code> if more exist.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="cat-callout info">
+        <div class="cat-callout-title">Display</div>
+        <p>Error cards are shown with a red left border in the detail view. Plain strings are displayed as-is. Object errors are rendered as label/value rows within bordered cards.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: TESTS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="tests">
+      <div class="cat-section-header">
+        <div class="cat-section-icon test">&#10003;</div>
+        <h2>Tests (ETS)</h2>
+      </div>
+      <p class="cat-section-desc">The <code>tests</code> field contains results from the WIS2 Evaluation and Test Suite (ETS), used to assess WCMP2 metadata compliance and data quality.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>String</td><td>Test identifier URI (e.g. <code>http://wis.wmo.int/spec/wcmp/2/conf/core</code>).</td></tr>
+          <tr><td><code>name</code></td><td>String</td><td>Human-readable test name (alternative to <code>id</code>).</td></tr>
+          <tr><td><code>status</code> / <code>code</code></td><td>String</td><td>Test outcome: <code>PASSED</code>, <code>SUCCESS</code>, <code>FAILED</code>, <code>ERROR</code>, <code>SKIPPED</code>.</td></tr>
+          <tr><td><code>message</code></td><td>String</td><td>Detailed description of the test result or failure reason.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Test Status Meanings</h3>
+      <table class="cat-table">
+        <thead>
+          <tr><th>Status</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="sev-badge" style="background:var(--success-bg);color:var(--success)">PASSED / SUCCESS</span></td><td>The test completed successfully. The requirement is met.</td></tr>
+          <tr><td><span class="sev-badge sev-badge-critical">FAILED / ERROR</span></td><td>The test did not pass. Requires investigation.</td></tr>
+          <tr><td><span class="sev-badge" style="background:var(--skipped-bg);color:var(--skipped)">SKIPPED</span></td><td>The test was not executed, typically because preconditions were not met.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: SUMMARY -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="summary">
+      <div class="cat-section-header">
+        <div class="cat-section-icon field">&#9632;</div>
+        <h2>Summary</h2>
+      </div>
+      <p class="cat-section-desc">The <code>summary</code> field is a dictionary of aggregated test result counts.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Key</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>PASSED</code></td><td>Integer</td><td>Number of tests that passed successfully.</td></tr>
+          <tr><td><code>FAILED</code></td><td>Integer</td><td>Number of tests that failed.</td></tr>
+          <tr><td><code>SKIPPED</code></td><td>Integer</td><td>Number of tests that were skipped.</td></tr>
+          <tr><td><code>WARNING</code></td><td>Integer</td><td>Number of tests with warnings.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="cat-callout accent">
+        <div class="cat-callout-title">ETS Report Status</div>
+        <p>An ETS report is considered to have an <strong>issue</strong> if any test did not pass — i.e. <code>total &ne; PASSED</code>. On the dashboard, reports with issues are highlighted with a yellow or red border.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: LINKS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="links">
+      <div class="cat-section-header">
+        <div class="cat-section-icon link">&#10138;</div>
+        <h2>Links</h2>
+      </div>
+      <p class="cat-section-desc">The <code>links</code> field contains an array of link objects referencing related resources.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Key</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>href</code></td><td>String (URL)</td><td>The URL of the linked resource.</td></tr>
+          <tr><td><code>rel</code></td><td>String</td><td>Link relation type (e.g. <code>canonical</code>, <code>related</code>, <code>via</code>).</td></tr>
+          <tr><td><code>type</code></td><td>String</td><td>MIME type of the resource (e.g. <code>application/geo+json</code>).</td></tr>
+          <tr><td><code>length</code></td><td>Integer</td><td>Size of the resource in bytes.</td></tr>
+          <tr><td><code>title</code></td><td>String</td><td>Human-readable title for the link.</td></tr>
+          <tr><td><code>hreflang</code></td><td>String</td><td>Language code of the linked resource (e.g. <code>en</code>).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: INCIDENTS -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="incidents">
+      <div class="cat-section-header">
+        <div class="cat-section-icon incident">&#9888;</div>
+        <h2>Incidents</h2>
+      </div>
+      <p class="cat-section-desc">Related alerts are grouped into incidents, enabling collaborative tracking, muting, notes, and activity history.</p>
+
+      <div class="cat-callout accent">
+        <div class="cat-callout-title">How Incidents Are Grouped</div>
+        <p>An incident hash is computed as <code>SHA-256("{title}:{node}")</code>. Alerts with the same title and node share the same incident hash, even if they occur at different times.</p>
+      </div>
+
+      <h3>Incident Features</h3>
+      <table class="cat-table">
+        <thead>
+          <tr><th>Feature</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Node History</strong></td><td>The detail page shows all other alerts for the same node, providing context on whether this is an isolated or recurring issue.</td></tr>
+          <tr><td><strong>Muting</strong></td><td>Agents can mute an incident for a configurable duration (5 min to 7 days). Muted incidents are hidden from the dashboard and monitor list for that user.</td></tr>
+          <tr><td><strong>Comments</strong></td><td>Agents can add comments to an incident. Visible in the activity timeline.</td></tr>
+          <tr><td><strong>Pinned Notes</strong></td><td>Timed notes that appear as a banner at the top of the detail page. Useful for marking an incident as "being investigated".</td></tr>
+          <tr><td><strong>Activity Timeline</strong></td><td>A chronological log of all actions: comments, emails sent, notes added/removed, muting/unmuting, and page views.</td></tr>
+          <tr><td><strong>Email Responsible</strong></td><td>Agents can send an email to the node's assigned responsible person directly from the detail page.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Activity Event Types</h3>
+      <table class="cat-table">
+        <thead>
+          <tr><th>Event</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>comment</code></td><td>A user added a comment to the incident.</td></tr>
+          <tr><td><code>email_sent</code></td><td>An email was sent to a node responsible.</td></tr>
+          <tr><td><code>note_added</code></td><td>A pinned note was added with an expiry time.</td></tr>
+          <tr><td><code>note_removed</code></td><td>A pinned note was deactivated before its expiry.</td></tr>
+          <tr><td><code>muted</code></td><td>The incident was muted by a user for a specified duration.</td></tr>
+          <tr><td><code>unmuted</code></td><td>The incident was unmuted by a user.</td></tr>
+          <tr><td><code>viewed</code></td><td>A user viewed the alert detail page (rate-limited to once per 5 minutes per user).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: DISPLAY TITLES -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="display-titles">
+      <div class="cat-section-header">
+        <div class="cat-section-icon display">&#9998;</div>
+        <h2>Display Titles</h2>
+      </div>
+      <p class="cat-section-desc">Display titles are computed during ingestion to provide clean, human-readable labels.</p>
+
+      <table class="cat-table">
+        <thead>
+          <tr><th>Pattern Detected</th><th>Display Title</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Title contains <code>Template:</code></td><td><strong>Maintenance: Template Notice</strong></td></tr>
+          <tr><td>Title contains <code>un-wmo-global-test</code></td><td><strong>Maintenance: Test System</strong></td></tr>
+          <tr><td>Title contains <code>CMA Global Monitor</code></td><td><strong>Maintenance: CMA Global Monitor</strong></td></tr>
+          <tr><td>Title contains <code>CMA Global Services</code></td><td><strong>Maintenance: CMA Global Services</strong></td></tr>
+          <tr><td>Title contains <code>CMA Global Broker</code></td><td><strong>Maintenance: CMA Global Broker</strong></td></tr>
+          <tr><td>Title contains <code>GISC Beijing</code></td><td><strong>Maintenance: GISC Beijing</strong></td></tr>
+          <tr><td>Title contains <code>DWD Service</code></td><td><strong>Maintenance: DWD Services</strong></td></tr>
+          <tr><td>Title contains <code>maintenance</code> (case-insensitive)</td><td><strong>Maintenance: General</strong></td></tr>
+          <tr><td>Description contains <code>context deadline exceeded</code></td><td><strong>Timeout: context deadline exceeded</strong></td></tr>
+          <tr><td>Description contains <code>unexpected EOF</code></td><td><strong>Network Termination: unexpected EOF</strong></td></tr>
+          <tr><td>Description contains <code>GOAWAY</code></td><td><strong>Network Termination: server sent GOAWAY</strong></td></tr>
+          <tr><td>Description contains <code>client connection lost</code></td><td><strong>Network Termination: client connection lost</strong></td></tr>
+          <tr><td>Description contains <code>connection refused</code></td><td><strong>Connection Refused</strong></td></tr>
+          <tr><td>Description contains <code>HTTP status 502</code></td><td><strong>HTTP Error: 502 Bad Gateway</strong></td></tr>
+          <tr><td>Description contains <code>HTTP status 403</code></td><td><strong>HTTP Error: 403 Forbidden</strong></td></tr>
+          <tr><td>Description contains <code>expected a valid start token</code></td><td><strong>Invalid Response</strong></td></tr>
+          <tr><td>Description contains <code>connection reset by peer</code></td><td><strong>Network Termination: connection reset by peer</strong></td></tr>
+          <tr><td>Description contains <code>i/o timeout</code></td><td><strong>Timeout: i/o timeout</strong></td></tr>
+          <tr><td>Title starts with <code>Target</code> and contains <code>is down</code></td><td><strong>Target is down</strong></td></tr>
+          <tr><td>No pattern matched</td><td>The raw title is used as-is.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- REFERENCE: NODES & SOURCES -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="nodes">
+      <div class="cat-section-header">
+        <div class="cat-section-icon field">&#9679;</div>
+        <h2>Nodes &amp; Sources</h2>
+      </div>
+      <p class="cat-section-desc">WIS2 nodes and monitoring sources are distinct concepts in the alert system.</p>
+
+      <div class="cat-callout accent">
+        <div class="cat-callout-title">Node vs Source</div>
+        <p>The <strong>node</strong> is the WIS2 Centre that is the subject of the alert (the entity being monitored). The <strong>source</strong> is the monitoring service that detected and reported the issue.</p>
+      </div>
+
+      <h3>Node Structure</h3>
+      <div class="field-card">
+        <div class="field-card-name">nodes.name</div>
+        <div class="field-card-type">String (Primary Key)</div>
+        <div class="field-card-desc">The WIS2 Centre identifier (e.g. <code>uk-metoffice-wmc</code>). Nodes are auto-created during ingestion.</div>
+      </div>
+
+      <h3>Responsible Persons</h3>
+      <div class="field-card">
+        <div class="field-card-name">node_responsibles</div>
+        <div class="field-card-type">name, email</div>
+        <div class="field-card-desc">Contact information for the person(s) responsible for a node. Used when sending alert notification emails.</div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SOURCES -->
+    <!-- ============================================================ -->
+    <div class="cat-section" id="sources">
+      <div class="cat-section-header">
+        <div class="cat-section-icon arch">&#9998;</div>
+        <h2>Sources</h2>
+      </div>
+
+      <ol class="source-list">
+        <li><span class="source-num">[1]</span> <strong>WMO WIS2 Monitoring Events</strong> — <a href="https://wmo-im.github.io/wis2-monitoring-events/standard/wis2-monitoring-events-DRAFT.html" target="_blank">https://wmo-im.github.io/wis2-monitoring-events/standard/wis2-monitoring-events-DRAFT.html</a></li>
+        <li><span class="source-num">[2]</span> <strong>GB functions and MQTT messages</strong> — <a href="https://www.wis-jma.go.jp/cms/gisc_tokyo/workshop/file/2025/JMA-WS2025_item11_GB%20functions%20and%20MQTT%20messages.pdf" target="_blank">https://www.wis-jma.go.jp/cms/gisc_tokyo/workshop/file/2025/JMA-WS2025_item11_GB%20functions%20and%20MQTT%20messages.pdf</a></li>
+        <li><span class="source-num">[3]</span> <strong>Update WIS2 Guide Part III — Sensor Centre ecosystem extensibility</strong> — <a href="https://github.com/wmo-im/et-w2it/issues/40" target="_blank">https://github.com/wmo-im/et-w2it/issues/40</a></li>
+        <li><span class="source-num">[4]</span> <strong>Internal Alerts Dataset</strong> — Collected empirical telemetry from active WIS2 monitoring environments</li>
+        <li><span class="source-num">[5]</span> <strong>WIS2 Cookbook</strong> — <a href="https://wmo-im.github.io/wis2-cookbook/cookbook/wis2-cookbook-DRAFT.html" target="_blank">https://wmo-im.github.io/wis2-cookbook/cookbook/wis2-cookbook-DRAFT.html</a></li>
+      </ol>
+    </div>
+
+  </main>
+</div>
+{% endblock %}

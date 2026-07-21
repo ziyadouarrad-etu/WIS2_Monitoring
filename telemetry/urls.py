@@ -17,7 +17,9 @@ urlpatterns = [
     path('api/alerts/per-day/', views.api_alerts_per_day, name='api_alerts_per_day'),
     path('api/alerts/', views.api_alerts, name='api_alerts'),
     path('api/alerts/filter-options/', views.filter_options_api, name='filter_options_api'),
+    path('api/alert/<uuid:alert_id>/history/', views.alert_history_fragment, name='alert_history_fragment'),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(next_page='login'), name='logout'),
     path('account/', views.account_view, name='account'),
+    path('catalogue/', views.alarms_catalogue, name='alarms_catalogue'),
 ]
