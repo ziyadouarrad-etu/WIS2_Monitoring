@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 ('specversion', models.CharField(max_length=10)),
                 ('event_type', models.CharField(max_length=255)),
                 ('source', models.CharField(max_length=255)),
-                ('subject', models.CharField(max_length=255)),
+                ('node', models.CharField(max_length=255, db_column='node')),
                 ('event_time', models.DateTimeField()),
                 ('datacontenttype', models.CharField(max_length=100)),
                 ('dataschema', models.TextField(blank=True, null=True)),

@@ -1,0 +1,908 @@
+{% extends "telemetry/base.html" %}
+{% load monitor_extras %}
+
+{% block title %}WIS2 Global Telemetry — Monitor{% endblock %}
+
+{% block header_subtitle %}Monitor{% endblock %}
+
+{% block find_alert %}
+<div class="find-alert" style="position:relative;">
+  <input type="text" id="findAlertInput" placeholder="Search by Alert ID" onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
+  <button class="fa-btn" onclick="findAlert()">Find</button>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(146,165,191,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(146,165,191,0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 75%);
+}
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 5px 11px;
+  border-radius: 20px;
+  border: 1px solid rgba(77,208,196,0.25);
+  background: var(--accent-dim);
+  cursor: help;
+}
+.live-ring {
+  position: relative;
+  width: 8px; height: 8px;
+}
+.live-ring::before, .live-ring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.live-ring::after {
+  box-shadow: 0 0 6px rgba(77,208,196,0.7);
+}
+.live-ring::before {
+  animation: ripple 1.8s ease-out infinite;
+}
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+.filters {
+  position: relative;
+  z-index: 100;
+  padding: 18px 32px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+.filter-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.filter-main {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  flex: 1;
+}
+.filter-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 20px;
+  flex-shrink: 0;
+}
+.filter-actions .btn,
+.filter-actions .clear {
+  width: 100%;
+  text-align: center;
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+.filter-group label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: left;
+}
+.filters select, .filters input, .filters .msd {
+  width: 100%;
+}
+.filters select, .filters input {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  transition: border-color 0.2s;
+  outline: none;
+}
+.filters select:focus, .filters input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.filters select option { background: var(--bg-card); }
+.filters input[type="text"] { font-family: var(--font-body); }
+.filters input[type="datetime-local"] { font-family: var(--font-body); }
+.filters input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1);
+  cursor: pointer;
+}
+[data-theme="light"] .filters input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+.filters input::placeholder { color: var(--text-muted); }
+.filters .btn {
+  padding: 7px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+  font-family: var(--font-display);
+  cursor: pointer;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.filters .btn:hover { background: var(--accent); color: #06231f; box-shadow: 0 0 14px rgba(77,208,196,0.35); }
+.filters .clear {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  text-decoration: none;
+  padding: 0 4px;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+.filters .clear:hover { color: var(--text-secondary); }
+.col-labels {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 1.2fr 1.2fr 2.5fr;
+  gap: 14px;
+  padding: 10px 16px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  position: relative;
+  z-index: 1;
+}
+.sort-btn {
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.sort-btn:hover { color: var(--accent); }
+.sort-btn.sort-active { color: var(--accent); }
+.sort-divider { color: var(--border); margin: 0 2px; }
+.container { position: relative; z-index: 1; padding: 18px 28px 40px; max-width: 1600px; margin: 0 auto; }
+.alerts { display: flex; flex-direction: column; gap: 5px; }
+.alert-row {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  transition: all 0.15s;
+  position: relative;
+}
+.alert-row:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-elevated);
+  transform: translateX(2px);
+}
+.alert-row:active {
+  transform: translateX(2px) scale(0.995);
+}
+.alert-row.new {
+  animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+             highlightFade 5s ease-out forwards;
+}
+@keyframes slideIn {
+  0% { opacity: 0; transform: translateY(-20px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes highlightFade {
+  0% {
+    background-color: rgba(77, 208, 196, 0.12);
+    border-color: rgba(77, 208, 196, 0.5);
+    box-shadow: 0 0 24px rgba(77, 208, 196, 0.08);
+  }
+  100% {
+    background-color: var(--bg-card);
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+.alert-inner {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 1.2fr 1.2fr 2.5fr;
+  gap: 14px;
+  padding: 12px 16px;
+  align-items: center;
+  border-radius: var(--radius);
+  box-shadow: inset 3px 0 0 transparent;
+}
+.alert-critical .alert-inner { box-shadow: inset 3px 0 0 var(--critical); }
+.alert-error .alert-inner { box-shadow: inset 3px 0 0 var(--error); }
+.alert-warning .alert-inner { box-shadow: inset 3px 0 0 var(--warning); }
+.alert-info .alert-inner { box-shadow: inset 3px 0 0 var(--info); }
+.cell-time {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.cell-sev {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #06141a;
+  background: var(--text-muted);
+  padding: 4px 10px 4px 9px;
+  clip-path: polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%);
+  line-height: 1.5;
+  white-space: nowrap;
+  display: inline-block;
+  width: fit-content;
+}
+.cell-sev-critical { background: var(--critical); }
+.cell-sev-error { background: var(--error); }
+.cell-sev-warning { background: var(--warning); color: #06141a; }
+.cell-sev-info { background: var(--info); }
+.cell-type {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+.cell-node {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+.cell-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+  word-break: break-word;
+  line-height: 1.4;
+}
+.cell-title small {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-left: 5px;
+}
+.empty {
+  text-align: center;
+  padding: 90px 20px;
+  color: var(--text-muted);
+}
+.empty-icon {
+  width: 56px; height: 56px;
+  margin: 0 auto 18px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  color: var(--text-muted);
+}
+.empty h3 { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+.empty p { font-size: 14px; font-family: var(--font-mono); }
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 24px 0 12px;
+  font-family: var(--font-mono);
+}
+.page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.page-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+.page-current {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 700;
+}
+.page-disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+.page-ellipsis {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  min-width: 24px;
+}
+.footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 20px 28px 32px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
+.footer code {
+  background: var(--bg-card);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.footer .live-status {
+  color: var(--accent);
+  font-weight: 600;
+}
+@media (max-width: 1000px) {
+  .alert-inner { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .alert-inner .cell-time { grid-column: 1 / -1; }
+  .alert-inner .cell-title { grid-column: 1 / -1; }
+  .col-labels { display: none; }
+}
+@media (max-width: 640px) {
+  .container { padding: 14px 14px 32px; }
+  .filters { padding: 12px 14px; }
+  .filter-body { flex-direction: column; }
+  .filter-actions { flex-direction: row; padding-top: 0; }
+  .filter-actions .btn,
+  .filter-actions .clear { width: auto; }
+  .filter-group { flex: 1 1 100%; }
+  .alert-inner { grid-template-columns: 1fr; gap: 5px; padding: 12px 14px; }
+  .alert-inner .cell-time { grid-column: 1; }
+  .alert-inner .cell-title { grid-column: 1; }
+}
+.msd-group { position: relative; flex: 1; min-width: 0; }
+.msd { position: relative; width: 100%; }
+.msd-trigger {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 8px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  font-size: 13px; font-family: var(--font-mono); cursor: pointer;
+  transition: border-color 0.2s; text-align: left; gap: 6px;
+}
+.msd-trigger:hover, .msd-trigger:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none;
+}
+.msd-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msd-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; margin-left: auto; }
+.msd.open .msd-arrow { transform: rotate(180deg); }
+.msd-panel {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 9999;
+  min-width: 100%; width: max-content; max-width: min(90vw, 720px);
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+  max-height: 360px; overflow: hidden;
+}
+.msd.open .msd-panel { display: flex; flex-direction: column; }
+.msd-search { padding: 10px 10px 8px; border-bottom: 1px solid var(--border); }
+.msd-search input {
+  width: 100%; padding: 7px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-inset, var(--bg)); color: var(--text);
+  font-size: 13px; font-family: var(--font-body); outline: none;
+}
+.msd-search input:focus { border-color: var(--accent); }
+.msd-search input::placeholder { color: var(--text-muted); }
+.msd-options { flex: 1; overflow-y: auto; overflow-x: auto; }
+.msd-option {
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+  cursor: pointer; transition: background 0.08s;
+  font-size: 13px; font-family: var(--font-mono); color: var(--text-secondary);
+  border-left: 2px solid transparent;
+}
+.msd-option:hover { background: var(--bg-elevated); border-left-color: var(--accent); }
+.msd-option:has(input:checked) { background: var(--accent-dim); border-left-color: var(--accent); color: var(--text); }
+.msd-option input { accent-color: var(--accent); flex-shrink: 0; margin: 0; width: 14px; height: 14px; }
+.msd-option span { white-space: nowrap; }
+.msd-clear {
+  display: block; width: 100%; padding: 9px 12px;
+  border: none; border-top: 1px solid var(--border); background: transparent;
+  color: var(--text-muted); font-family: var(--font-mono);
+  font-size: 11px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em;
+  transition: all 0.12s;
+}
+.msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
+@media (prefers-reduced-motion: reduce) {
+  .header::after, .live-ring::before, .alert-row.new { animation: none; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="filters">
+  <form id="filter-form" method="get" style="width:100%;">
+    <div class="filter-body"><div class="filter-main">
+      <div class="filter-group msd-group" data-name="severity">
+        <label>Severity</label>
+        <div class="msd">
+          <button type="button" class="msd-trigger">
+            <span class="msd-text">All</span>
+            <span class="msd-arrow">&#9662;</span>
+          </button>
+          <div class="msd-panel">
+            <div class="msd-options">
+              <label class="msd-option">
+                <input type="checkbox" name="severity" value="CRITICAL" {% if 'CRITICAL' in current_severities %}checked{% endif %}>
+                <span>CRITICAL</span>
+              </label>
+              <label class="msd-option">
+                <input type="checkbox" name="severity" value="ERROR" {% if 'ERROR' in current_severities %}checked{% endif %}>
+                <span>ERROR</span>
+              </label>
+              <label class="msd-option">
+                <input type="checkbox" name="severity" value="WARNING" {% if 'WARNING' in current_severities %}checked{% endif %}>
+                <span>WARNING</span>
+              </label>
+              <label class="msd-option">
+                <input type="checkbox" name="severity" value="INFO" {% if 'INFO' in current_severities %}checked{% endif %}>
+                <span>INFO</span>
+              </label>
+            </div>
+            <button type="button" class="msd-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-group msd-group" data-name="type">
+        <label>Type</label>
+        <div class="msd">
+          <button type="button" class="msd-trigger">
+            <span class="msd-text">All</span>
+            <span class="msd-arrow">&#9662;</span>
+          </button>
+          <div class="msd-panel">
+            <div class="msd-search"><input type="text" placeholder="Search types..."></div>
+            <div class="msd-options">
+              {% for t in type_choices %}
+              <label class="msd-option">
+                <input type="checkbox" name="type" value="{{ t }}" {% if t in current_types %}checked{% endif %}>
+                <span>{{ t|event_type_label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <button type="button" class="msd-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-group msd-group" data-name="node">
+        <label>Node</label>
+        <div class="msd">
+          <button type="button" class="msd-trigger">
+            <span class="msd-text">All</span>
+            <span class="msd-arrow">&#9662;</span>
+          </button>
+          <div class="msd-panel">
+            <div class="msd-search"><input type="text" placeholder="Search nodes..."></div>
+            <div class="msd-options">
+              {% for n in node_choices %}
+              <label class="msd-option">
+                <input type="checkbox" name="node" value="{{ n }}" {% if n in current_nodes %}checked{% endif %}>
+                <span>{{ n }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <button type="button" class="msd-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-group msd-group" data-name="source">
+        <label>Source</label>
+        <div class="msd">
+          <button type="button" class="msd-trigger">
+            <span class="msd-text">All</span>
+            <span class="msd-arrow">&#9662;</span>
+          </button>
+          <div class="msd-panel">
+            <div class="msd-search"><input type="text" placeholder="Search sources..."></div>
+            <div class="msd-options">
+              {% for n in source_choices %}
+              <label class="msd-option">
+                <input type="checkbox" name="source" value="{{ n }}" {% if n in current_sources %}checked{% endif %}>
+                <span>{{ n }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <button type="button" class="msd-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-group msd-group" data-name="category">
+        <label>Category</label>
+        <div class="msd">
+          <button type="button" class="msd-trigger">
+            <span class="msd-text">All</span>
+            <span class="msd-arrow">&#9662;</span>
+          </button>
+          <div class="msd-panel">
+            <div class="msd-search"><input type="text" placeholder="Search categories..."></div>
+            <div class="msd-options">
+              {% for c in category_choices %}
+              <label class="msd-option">
+                <input type="checkbox" name="category" value="{{ c }}" {% if c in current_categories %}checked{% endif %}>
+                <span>{{ c }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <button type="button" class="msd-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-group msd-group" data-name="alert">
+        <label>Alert</label>
+        <div class="msd">
+          <button type="button" class="msd-trigger">
+            <span class="msd-text">All</span>
+            <span class="msd-arrow">&#9662;</span>
+          </button>
+          <div class="msd-panel">
+            <div class="msd-search"><input type="text" placeholder="Search alerts..."></div>
+            <div class="msd-options">
+              {% for t in alert_choices %}
+              <label class="msd-option">
+                <input type="checkbox" name="alert" value="{{ t }}" {% if t in current_alerts %}checked{% endif %}>
+                <span>{{ t }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <button type="button" class="msd-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label for="time_from">From</label>
+        <input type="datetime-local" id="time_from" name="time_from" value="{{ current_time_from }}">
+      </div>
+      <div class="filter-group">
+        <label for="time_to">To</label>
+        <input type="datetime-local" id="time_to" name="time_to" value="{{ current_time_to }}">
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn">Filter</button>
+      {% if current_severities or current_nodes or current_types or current_alerts or current_categories or current_sources or current_time_from or current_time_to %}
+        <a href="{% url 'monitor_alerts' %}" class="clear">Clear</a>
+      {% endif %}
+    </div>
+  </div>
+  </form>
+</div>
+
+<div class="container">
+  {% if alerts %}
+  <div class="col-labels">
+    <span>
+      <span class="sort-btn {% if current_sort == 'event_time' %}sort-active{% endif %}" data-sort="event_time">Time (UTC)</span>
+      <span class="sort-divider">/</span>
+      <span class="sort-btn {% if current_sort == 'ingested_at' %}sort-active{% endif %}" data-sort="ingested_at">Received at</span>
+    </span>
+    <span>Severity</span>
+    <span>Type</span>
+    <span>Node</span>
+    <span>Alert</span>
+  </div>
+  {% endif %}
+  <div class="alerts" id="alert-list">
+    {% for a in alerts %}
+    <a href="{% url 'alert_detail' a.id %}" class="alert-row alert-{{ a.severity|lower }}" data-id="{{ a.id }}" data-event-time="{{ a.event_time|date:'c' }}" data-ingested-at="{{ a.ingested_at|date:'c' }}">
+      <div class="alert-inner">
+        <div class="cell-time">{{ a.event_time|date:'Y-m-d H:i:s' }}</div>
+        <div class="cell-sev cell-sev-{{ a.severity|lower }}">{{ a.severity }}</div>
+        <div class="cell-type">{{ a.event_type|event_type_label|truncatechars:25 }}</div>
+        <div class="cell-node">{{ a.node_id|truncatechars:25 }}</div>
+        <div class="cell-title">{% firstof a.display_title a.event_type|event_type_label %}{% if a.subtype %} <small>({{ a.subtype }})</small>{% endif %}</div>
+      </div>
+    </a>
+    {% empty %}
+    <div class="empty">
+      <div class="empty-icon">&#9776;</div>
+      <h3>No alerts</h3>
+      <p>// no alerts match the current filters</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+      <a class="page-link" href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.previous_page_number }}">← Prev</a>
+    {% else %}
+      <span class="page-link page-disabled">← Prev</span>
+    {% endif %}
+    {% for p in page_obj.paginator.page_range %}
+      {% if p == page_obj.number %}
+        <span class="page-link page-current">{{ p }}</span>
+      {% elif p == 1 or p == page_obj.paginator.num_pages or p >= page_obj.number|add:"-2" and p <= page_obj.number|add:"2" %}
+        <a class="page-link" href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ p }}">{{ p }}</a>
+      {% elif p == page_obj.number|add:"-3" or p == page_obj.number|add:"3" %}
+        <span class="page-link page-ellipsis">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <a class="page-link" href="?{% if base_query %}{{ base_query }}&{% endif %}page={{ page_obj.next_page_number }}">Next →</a>
+    {% else %}
+      <span class="page-link page-disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.msd').forEach(function(msd) {
+  const trigger = msd.querySelector('.msd-trigger');
+  const panel = msd.querySelector('.msd-panel');
+  const options = msd.querySelectorAll('.msd-option input');
+  const textEl = msd.querySelector('.msd-text');
+  const searchInput = msd.querySelector('.msd-search input');
+  const clearBtn = msd.querySelector('.msd-clear');
+
+  function updateText() {
+    const checked = msd.querySelectorAll('.msd-option input:checked');
+    textEl.textContent = checked.length ? checked.length + ' selected' : 'All';
+  }
+
+  function positionPanel() {
+    panel.style.left = '';
+    panel.style.right = '';
+    var rect = panel.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      panel.style.left = 'auto';
+      panel.style.right = '0';
+    }
+  }
+
+  trigger.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var wasOpen = msd.classList.contains('open');
+    document.querySelectorAll('.msd.open').forEach(function(el) { el.classList.remove('open'); });
+    if (!wasOpen) {
+      msd.classList.add('open');
+      positionPanel();
+      if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
+      setTimeout(function() { searchInput && searchInput.focus(); }, 50);
+    }
+  });
+
+  panel.addEventListener('click', function(e) { e.stopPropagation(); });
+  document.addEventListener('click', function() { msd.classList.remove('open'); });
+
+  options.forEach(function(cb) { cb.addEventListener('change', updateText); });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      msd.querySelectorAll('.msd-option').forEach(function(opt) {
+        if (opt.dataset.filterValid === 'false') {
+          opt.style.display = 'none';
+          return;
+        }
+        opt.style.display = opt.textContent.toLowerCase().includes(q) ? 'flex' : 'none';
+      });
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      msd.querySelectorAll('.msd-option input:checked').forEach(function(cb) { cb.checked = false; cb.dispatchEvent(new Event('change')); });
+      updateText();
+    });
+  }
+
+  updateText();
+});
+
+(function() {
+  var debounceTimer;
+  var fetching = false;
+  function applyFilterOptions(data) {
+    Object.keys(data).forEach(function(key) {
+      var group = document.querySelector('.msd-group[data-name="' + key + '"]');
+      if (!group) return;
+      var valid = data[key] || [];
+      var searchInput = group.querySelector('.msd-search input');
+      var searchQ = searchInput ? searchInput.value.toLowerCase() : '';
+      group.querySelectorAll('.msd-option').forEach(function(opt) {
+        var cb = opt.querySelector('input');
+        if (!cb) return;
+        var isChecked = cb.checked;
+        var isValid = isChecked || valid.indexOf(cb.value) !== -1;
+        opt.dataset.filterValid = isValid ? 'true' : 'false';
+        if (!isValid) {
+          opt.style.display = 'none';
+        } else if (searchQ && !opt.textContent.toLowerCase().includes(searchQ)) {
+          opt.style.display = 'none';
+        } else {
+          opt.style.display = 'flex';
+        }
+      });
+    });
+  }
+  function updateFilterOptions() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function() {
+      if (fetching) return;
+      var params = new URLSearchParams();
+      params.set('_', Date.now());
+      document.querySelectorAll('.msd-group').forEach(function(group) {
+        var name = group.dataset.name;
+        if (!name) return;
+        group.querySelectorAll('.msd-option input:checked').forEach(function(cb) {
+          params.append(name, cb.value);
+        });
+      });
+      document.querySelectorAll('.filter-group input[type="datetime-local"]').forEach(function(input) {
+        if (input.value) params.set(input.name, input.value);
+      });
+      fetching = true;
+      fetch('/api/alerts/filter-options/?' + params.toString())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          fetching = false;
+          applyFilterOptions(data);
+        })
+        .catch(function(e) {
+          fetching = false;
+          console.warn('Filter options fetch failed:', e);
+        });
+    }, 120);
+  }
+  document.querySelectorAll('.msd-option input').forEach(function(cb) {
+    cb.addEventListener('change', updateFilterOptions);
+  });
+  document.querySelectorAll('.filter-group input[type="datetime-local"]').forEach(function(input) {
+    input.addEventListener('change', updateFilterOptions);
+  });
+  updateFilterOptions();
+})();
+
+(function() {
+  const list = document.getElementById('alert-list');
+  const currentSort = '{{ current_sort }}';
+  const sortField = currentSort === 'ingested_at' ? 'ingestedAt' : 'eventTime';
+  const apiSortField = currentSort === 'ingested_at' ? 'ingested_at' : 'event_time';
+  let maxIngestedAt = '{{ latest_ingested_iso }}';
+
+  document.querySelectorAll('.sort-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const sort = this.dataset.sort;
+      const url = new URL(window.location);
+      url.searchParams.set('sort', sort);
+      url.searchParams.delete('page');
+      window.location = url.toString();
+    });
+  });
+
+  function getPollUrl() {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('page');
+    if (maxIngestedAt) params.set('since', maxIngestedAt);
+    const qs = params.toString();
+    return '/api/alerts/' + (qs ? '?' + qs : '');
+  }
+
+  function eventTypeLabel(v) {
+    if (!v) return '';
+    var parts = v.split('.');
+    return parts.length >= 2 ? parts.slice(-2).join(' ') : v;
+  }
+
+  function createAlertRow(a) {
+    const sev = a.severity.toLowerCase();
+    const link = document.createElement('a');
+    link.href = '/alert/' + a.id + '/';
+    link.className = 'alert-row alert-' + sev + ' new';
+    link.dataset.id = a.id;
+    link.dataset.eventTime = a.event_time;
+    link.dataset.ingestedAt = a.ingested_at;
+    link.innerHTML = `
+      <div class="alert-inner">
+        <div class="cell-time">${a.event_time.replace('T', ' ').substring(0, 19)}</div>
+        <div class="cell-sev cell-sev-${sev}">${a.severity}</div>
+        <div class="cell-type">${eventTypeLabel(a.event_type||'').substring(0,25)}</div>
+              <div class="cell-node">${(a.node||'').substring(0,25)}</div>
+        <div class="cell-title">${a.display_title || eventTypeLabel(a.event_type)}${a.subtype ? ' <small>('+a.subtype+')</small>' : ''}</div>
+      </div>
+    `;
+    return link;
+  }
+
+  function insertSorted(link) {
+    const rows = list.querySelectorAll('.alert-row');
+    let inserted = false;
+    for (const row of rows) {
+      if (row.dataset[sortField] < link.dataset[sortField]) {
+        list.insertBefore(link, row);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) {
+      list.appendChild(link);
+    }
+  }
+
+  async function poll() {
+    try {
+      const url = getPollUrl();
+      const resp = await fetch(url);
+      const data = await resp.json();
+      if (data.count > 0) {
+        const existingIds = new Set();
+        list.querySelectorAll('.alert-row').forEach(row => existingIds.add(row.dataset.id));
+        const newAlerts = data.alerts.filter(a => !existingIds.has(a.id));
+        if (newAlerts.length === 0) return;
+        const latest = newAlerts.reduce((a, b) => a.ingested_at > b.ingested_at ? a : b);
+        if (latest.ingested_at > maxIngestedAt) maxIngestedAt = latest.ingested_at;
+        newAlerts.sort((a, b) => a[apiSortField].localeCompare(b[apiSortField]));
+        newAlerts.forEach(a => insertSorted(createAlertRow(a)));
+      }
+    } catch(e) {
+      console.warn('Poll failed:', e);
+    }
+  }
+
+  setInterval(poll, 5000);
+})();
+
+function showToast(text) {
+  var old = document.getElementById('findAlertMsg');
+  if (old) old.remove();
+  var msg = document.createElement('div');
+  msg.id = 'findAlertMsg';
+  msg.textContent = text;
+  msg.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:8px 16px;z-index:99999;font-family:var(--font-mono);font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+  document.body.appendChild(msg);
+  setTimeout(function(){ msg.remove(); }, 2000);
+}
+function findAlert() {
+  var input = document.getElementById('findAlertInput');
+  var id = input.value.trim();
+  if (!id) return;
+  fetch('/api/alert-exists/' + encodeURIComponent(id) + '/')
+    .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
+    .then(function(data) {
+      if (data.exists) { window.location = '/alert/' + encodeURIComponent(id) + '/'; }
+      else { showToast('No alert found with this ID.'); }
+    })
+    .catch(function(){ showToast('Could not check alert. Please try again.'); });
+}
+</script>
+{% endblock %}

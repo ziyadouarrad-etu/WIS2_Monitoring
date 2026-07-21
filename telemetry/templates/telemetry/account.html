@@ -1,0 +1,95 @@
+{% extends "telemetry/base.html" %}
+{% block title %}WIS2 Global Telemetry — Account{% endblock %}
+{% block header_subtitle %}Account{% endblock %}
+{% block side_menu_links %}
+{% endblock %}
+{% block extra_css %}
+.container { max-width: 800px; margin: 40px auto; padding: 0 28px; }
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+.card-body { padding: 20px; }
+.field-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.field-row:last-child { border-bottom: none; }
+.field-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+.field-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text);
+  word-break: break-all;
+}
+.node-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+}
+@media (max-width: 640px) {
+  .container { padding: 0 14px; margin: 20px auto; }
+}
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="card">
+    <div class="card-header">Account</div>
+    <div class="card-body">
+      <div class="field-row">
+        <span class="field-label">Username</span>
+        <span class="field-value">{{ username }}</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Name</span>
+        <span class="field-value">{{ full_name }}</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Email</span>
+        <span class="field-value">{{ email }}</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Role</span>
+        <span class="field-value">{% if is_admin %}Admin{% else %}Agent{% endif %}</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Nodes</span>
+        <span class="field-value" style="display:flex;flex-wrap:wrap;gap:4px;">
+          {% for n in allowed_nodes %}
+          <span class="node-tag">{{ n.name }}</span>
+          {% empty %}
+          <span style="color:var(--text-muted);font-size:12px;">No nodes assigned</span>
+          {% endfor %}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -10,13 +10,8 @@ register = template.Library()
 def event_type_label(value):
     if not value:
         return ''
-    mapping = {
-        'int.wmo.wis.wme.event': 'WME Event',
-        'int.wmo.wis.wme.event.item.download': 'Item Download',
-        'int.wmo.wis.wme.wnm.validation.metadata': 'WNM Metadata Validation',
-        'int.wmo.wis.wme.wnm.validation.schema': 'WNM Schema Validation',
-    }
-    return mapping.get(value, value.rsplit('.', 1)[-1].replace('_', ' ').title())
+    parts = value.split('.')
+    return ' '.join(parts[-2:]) if len(parts) >= 2 else value
 
 
 # ---------------------------------------------------------------------------

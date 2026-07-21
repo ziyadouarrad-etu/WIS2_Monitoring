@@ -1,12 +1,11 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Incident {{ alert.incident_hash|truncatechars:10 }} - WIS2 Telemetry</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Incident {{ alert.id|truncatechars:10 }} - WIS2 Telemetry</title>
+<link rel="stylesheet" href="{% static 'telemetry/fonts/fonts.css' %}">
 <style>
 :root {
   /* Surfaces - lifted from near-black to dark charcoal, easier on eyes */
@@ -90,89 +89,136 @@ body::after {
 
 /* ---------- Header ---------- */
 .header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: linear-gradient(180deg, #151c26 0%, #11161e 100%);
+  position: sticky; top: 0; z-index: 100;
+  background: linear-gradient(180deg, #0e1828 0%, #0a121f 100%);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(14px);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 68px; backdrop-filter: blur(14px);
+  overflow: hidden;
 }
-.header-row {
-  padding: 0 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 64px;
+.header::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: -10%;
+  width: 140px;
+  background: linear-gradient(90deg, transparent, rgba(77,208,196,0.06), transparent);
+  animation: sweep 9s linear infinite;
+  pointer-events: none;
 }
-.brand { display: flex; align-items: baseline; gap: 11px; }
-.brand .mark {
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 15px;
+@keyframes sweep {
+  0% { left: -15%; }
+  100% { left: 115%; }
 }
-.header h1 {
-  font-family: var(--font-display);
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text);
-}
-.header .subtitle {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding-left: 12px;
-  margin-left: 2px;
-  border-left: 1px solid var(--border-strong);
-}
-.header-right { display: flex; align-items: center; gap: 18px; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand .mark { color: var(--accent); font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.12em; }
+.header h1 { font-family: var(--font-display); font-size: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+.header .subtitle { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.header-right { display: flex; align-items: center; gap: 22px; position: relative; z-index: 1; }
+.header-right button, .header-right .nav-link, .header-right input, .header-right .fa-btn { font-size: 12px; padding: 4px 10px; border-radius: 4px; }
 .header-time {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-muted);
 }
-/* Signal trace -- a telemetry pulse rendered in the active severity color */
-.signal-trace { display: block; width: 100%; height: 18px; line-height: 0; }
-.signal-trace svg { width: 100%; height: 100%; display: block; }
-.signal-trace path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-  opacity: 0.85;
+.nav-link {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--accent); text-decoration: none; text-transform: uppercase;
+  letter-spacing: 0.08em; padding: 5px 12px; border-radius: 4px;
+  border: 1px solid var(--accent); background: var(--accent-bg);
+  transition: all 0.15s;
 }
-.signal-critical { color: var(--critical); }
-.signal-error { color: var(--error); }
-.signal-warning { color: var(--warning); }
-.signal-info { color: var(--info); }
+.nav-link:hover { background: var(--accent); color: #06231f; box-shadow: 0 0 14px rgba(58,181,171,0.35); }
+.find-alert { display: flex; align-items: center; gap: 4px; }
+.find-alert input {
+  font-family: var(--font-mono); font-size: 12px; padding: 4px 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); width: 130px; outline: none;
+}
+.find-alert input:focus { border-color: var(--accent); }
+.find-alert input::placeholder { color: var(--text-muted); }
+.find-alert .fa-btn {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  padding: 4px 10px; background: transparent; border: 1px solid var(--accent);
+  color: var(--accent); border-radius: 4px; cursor: pointer; transition: all 0.15s;
+}
+.find-alert .fa-btn:hover { background: var(--accent); color: #06231f; }
+.side-menu-overlay {
+  display: none; position: fixed; inset: 0; z-index: 99990;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+}
+.side-menu-overlay.open { display: block; }
+.side-menu {
+  position: fixed; top: 0; right: -280px; width: 260px; height: 100%;
+  z-index: 99991; background: var(--bg-card);
+  border-left: 1px solid var(--border);
+  transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; flex-direction: column;
+  box-shadow: -12px 0 40px rgba(0,0,0,0.4);
+}
+.side-menu.open { right: 0; }
+.sm-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 16px 14px; border-bottom: 1px solid var(--border);
+}
+.sm-user { display: flex; align-items: center; gap: 10px; }
+.sm-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent); color: #06231f;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 15px;
+}
+.sm-greeting { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+.sm-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.sm-close {
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+  font-size: 18px; cursor: pointer; width: 28px; height: 28px;
+  border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono);
+}
+.sm-close:hover { border-color: var(--accent); color: var(--accent); }
+.sm-body { flex: 1; overflow-y: auto; padding: 12px 0; }
+.sm-section-label {
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-muted);
+  padding: 10px 16px 6px;
+}
+.sm-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 16px; border: none; background: transparent;
+  font-family: var(--font-body); font-size: 14px; color: var(--text-secondary);
+  cursor: pointer; text-decoration: none; transition: background 0.12s;
+  border-radius: 0;
+}
+.sm-item:hover { background: rgba(77,208,196,0.08); color: var(--text); }
+.sm-item .sm-icon { width: 20px; text-align: center; font-size: 16px; color: var(--accent); }
+.sm-danger { color: var(--critical) !important; }
+.sm-danger:hover { background: rgba(255,90,90,0.1) !important; }
+.sm-footer { border-top: 1px solid var(--border); padding: 8px 0; }
+.sm-footer form { margin: 0; }
+[data-theme="light"] {
+  --bg: #f2f5f9; --bg-card: #ffffff; --bg-elevated: #e8ecf2;
+  --bg-inset: #f7f9fb; --border: #d0d7e2; --border-hover: #b8c1ce;
+  --text: #1a2332; --text-secondary: #3d4b5c; --text-muted: #72839b;
+  --critical: #dc3b3b; --critical-bg: rgba(220,59,59,0.08);
+  --error: #cc7a2e; --error-bg: rgba(204,122,46,0.08);
+  --warning: #b8942e; --warning-bg: rgba(184,148,46,0.08);
+  --info: #3a7bbd; --info-bg: rgba(58,123,189,0.08);
+  --accent: #1f8a7e; --accent-dim: rgba(31,138,126,0.10);
+  --success: #2d8f62; --success-bg: rgba(45,143,98,0.08);
+  color-scheme: light;
+}
+[data-theme="light"] .header { background: linear-gradient(180deg, #e8ecf2 0%, #dce2ea 100%); }
+[data-theme="light"] .header::after { background: linear-gradient(90deg, transparent, rgba(31,138,126,0.08), transparent); }
+[data-theme="light"] .nav-link:hover { color: #fff; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #bac4d0; }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.menu-btn {
+  font-family: var(--font-mono); background: transparent;
+  border: 1px solid var(--border); color: var(--text-muted);
+  cursor: pointer; border-radius: 4px; transition: all 0.15s; line-height: 1;
+}
+.menu-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 .container { position: relative; z-index: 1; padding: 26px 28px 48px; max-width: 1180px; margin: 0 auto; }
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  text-decoration: none;
-  margin-bottom: 20px;
-  padding: 7px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  transition: all 0.15s ease;
-  width: fit-content;
-}
-.back-link:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-bg);
-}
-.back-link .arrow { transition: transform 0.15s ease; display: inline-block; }
-.back-link:hover .arrow { transform: translateX(-3px); }
 
 /* ---------- Cards ---------- */
 .card {
@@ -192,15 +238,20 @@ body::after {
   width: 6px;
   align-self: stretch;
   border-radius: 3px;
-  margin-right: 20px;
+  margin-right: 22px;
 }
-.hero-rail-critical { background: var(--critical); box-shadow: 0 0 18px -2px var(--critical); }
-.hero-rail-error { background: var(--error); box-shadow: 0 0 18px -2px var(--error); }
-.hero-rail-warning { background: var(--warning); box-shadow: 0 0 18px -2px var(--warning); }
-.hero-rail-info { background: var(--info); box-shadow: 0 0 18px -2px var(--info); }
+.hero-rail-critical { background: var(--critical); box-shadow: 0 0 24px -2px var(--critical); }
+.hero-rail-error { background: var(--error); box-shadow: 0 0 24px -2px var(--error); }
+.hero-rail-warning { background: var(--warning); box-shadow: 0 0 24px -2px var(--warning); }
+.hero-rail-info { background: var(--info); box-shadow: 0 0 24px -2px var(--info); }
 
 .hero-body { flex: 1; min-width: 0; }
 .hero-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.hero-card { border-top: 3px solid; border-top-color: var(--border); }
+.hero-card-critical { border-top-color: var(--critical); }
+.hero-card-error { border-top-color: var(--error); }
+.hero-card-warning { border-top-color: var(--warning); }
+.hero-card-info { border-top-color: var(--info); }
 .hero-sev-pill {
   display: inline-flex;
   align-items: center;
@@ -231,79 +282,212 @@ body::after {
   50% { box-shadow: 0 0 14px currentColor; opacity: 0.6; }
 }
 
-.hero-hash {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-muted);
-}
 
 .hero-title {
   font-family: var(--font-display);
   font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  line-height: 1.25;
-  color: var(--text);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  background: linear-gradient(135deg, var(--text) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
   word-break: break-word;
-  margin-bottom: 5px;
 }
 .hero-byline {
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 4px;
 }
-
-.meta-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px 28px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-.meta-item { display: flex; flex-direction: column; gap: 4px; }
-.meta-label {
+.hero-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: var(--font-mono);
+  margin-right: 6px;
 }
-.meta-value {
+.hero-value {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
   color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 16px;
-  word-break: break-all;
 }
-.meta-copy {
+.hero-subject {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.hero-id-line {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.hero-id-value {
+  color: var(--accent);
+  font-weight: 600;
   cursor: pointer;
-  transition: color 0.15s;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  transition: all 0.15s;
   position: relative;
 }
-.meta-copy:hover { color: var(--accent); }
-.copy-feedback {
-  position: absolute;
-  top: -6px;
-  left: 50%;
-  transform: translate(-50%, -100%) scale(0.92);
-  font-family: var(--font-mono);
+.hero-id-value:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.id-copy-feedback {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  white-space: nowrap;
   color: var(--accent);
   background: var(--bg-card);
   padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: 4px;
   border: 1px solid var(--accent);
-  pointer-events: none;
   opacity: 0;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.15s;
+  pointer-events: none;
 }
-.copy-feedback.show { opacity: 1; transform: translate(-50%, -130%) scale(1); }
+.id-copy-feedback.show { opacity: 1; }
 
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.meta-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  transform: translateY(-1px);
+}
+.meta-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 9.5px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.meta-label::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+.meta-value {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-all;
+  line-height: 1.35;
+}
+/* Email button */
+.email-btn {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  padding: 7px 16px; margin-top: 16px;
+  background: transparent; border: 1px solid var(--accent);
+  color: var(--accent); border-radius: 4px; cursor: pointer;
+  transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+}
+.email-btn:hover { background: var(--accent); color: #06231f; }
+/* Email modal */
+.email-overlay {
+  display: none; position: fixed; inset: 0; z-index: 99995;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
+}
+.email-overlay.open { display: block; }
+.email-modal {
+  display: none; position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); z-index: 99996;
+  width: 420px; max-width: 92vw;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  font-family: var(--font-mono);
+}
+.email-modal.open { display: block; }
+.email-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+.email-modal-close {
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+  font-size: 18px; cursor: pointer; border-radius: 4px;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+}
+.email-modal-close:hover { border-color: var(--accent); color: var(--accent); }
+.email-modal-body { padding: 18px; }
+.email-modal-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 18px; border-top: 1px solid var(--border);
+}
+.email-field { margin-bottom: 14px; }
+.email-field:last-child { margin-bottom: 0; }
+.email-label {
+  display: block; font-size: 11px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+}
+.email-select, .email-textarea {
+  width: 100%; font-family: var(--font-mono); font-size: 13px;
+  padding: 8px 10px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px; outline: none;
+}
+.email-select:focus, .email-textarea:focus { border-color: var(--accent); }
+.email-textarea { resize: vertical; min-height: 60px; }
+.email-no-responsibles {
+  font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0;
+}
+.email-btn-cancel, .email-btn-send {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  padding: 6px 14px; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+}
+.email-btn-cancel {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+}
+.email-btn-cancel:hover { border-color: var(--accent); color: var(--accent); }
+.email-btn-send {
+  background: var(--accent); border: 1px solid var(--accent); color: #06231f;
+}
+.email-btn-send:hover { box-shadow: 0 0 12px rgba(77,208,196,0.3); }
+.email-btn-send:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.email-status {
+  font-size: 12px; padding: 8px 12px; border-radius: 4px; margin-bottom: 10px;
+  display: none; text-align: center;
+}
+.email-status.error { display: block; background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical); }
+.email-status.success { display: block; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
 .section-label {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -946,14 +1130,14 @@ body::after {
 }
 
 @media (max-width: 768px) {
-  .header-row { padding: 14px 16px; height: auto; flex-direction: column; align-items: flex-start; gap: 8px; }
-  .header .subtitle { border-left: none; padding-left: 0; margin-left: 0; }
+  .header { height: auto; padding: 14px 16px; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .header-right { width: 100%; justify-content: flex-end; }
   .container { padding: 16px 14px 36px; }
   .card-body { padding: 18px 18px; }
   .hero { gap: 0; }
   .hero-rail { width: 4px; margin-right: 14px; }
   .hero-title { font-size: 20px; }
-  .meta-grid { gap: 14px 18px; }
+  .meta-grid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
   .test-grid { grid-template-columns: 1fr; }
   .summary-grid { flex-direction: column; }
   .tab-btn { padding: 7px 12px; font-size: 11px; }
@@ -964,57 +1148,361 @@ body::after {
   .history-title { width: 100%; white-space: normal; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .back-link .arrow { transition: none; }
-  .back-link:hover .arrow { transform: none; }
   .hero-sev-pill-critical::before, .hero-sev-pill-error::before { animation: none; }
   .tab-pane.active { animation: none; }
   .test-card, .summary-stat, .wnm-link-card, .history-card { transition: none; }
 }
+
+/* ---------- Activity Section ---------- */
+.activity-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px;
+}
+.activity-header-title {
+  display: flex; align-items: center; gap: 8px;
+}
+.activity-live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse-dot 2.2s ease-in-out infinite;
+}
+.activity-header-actions { display: flex; gap: 8px; }
+.activity-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.activity-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+.primary-btn {
+  background: var(--accent);
+  color: #06231f;
+  border-color: var(--accent);
+}
+.primary-btn:hover { background: var(--accent); color: #06231f; box-shadow: 0 0 14px rgba(58,181,171,0.4); }
+.primary-btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.secondary-btn { color: var(--text-muted); }
+.secondary-btn.active-note { border-color: var(--warning); color: var(--warning); background: var(--warning-bg); }
+.mute-btn { color: var(--warning); border-color: var(--warning); }
+.mute-btn:hover { background: var(--warning); color: #1a1505; }
+.unmute-btn {
+  color: var(--critical); border-color: var(--critical); background: var(--critical-bg);
+}
+.unmute-btn:hover { background: var(--critical); color: #fff; }
+.unmute-btn::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+.notes-banner {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 8px 24px -16px rgba(0,0,0,0.5);
+}
+.note-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(219,185,62,0.2);
+}
+.note-item:last-child { border-bottom: none; }
+.note-text { flex: 1; color: var(--text); line-height: 1.5; }
+.note-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.note-dismiss {
+  background: none; border: 1px solid transparent; cursor: pointer;
+  color: var(--text-muted); font-size: 14px; line-height: 1;
+  width: 20px; height: 20px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); flex-shrink: 0;
+  transition: all 0.15s;
+}
+.note-dismiss:hover { color: var(--critical); border-color: var(--critical); background: var(--critical-bg); }
+
+.activity-compose {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  background: var(--bg-inset);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.activity-compose:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+.activity-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  resize: vertical;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--text);
+  outline: none;
+  line-height: 1.5;
+  min-height: 38px;
+}
+.activity-textarea::placeholder { color: var(--text-muted); }
+.activity-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  gap: 8px;
+}
+.activity-note-opts { display: flex; align-items: center; gap: 6px; }
+.activity-select {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+.activity-select:focus { border-color: var(--accent); }
+.activity-compose-btns { display: flex; gap: 6px; }
+
+.activity-timeline {
+  position: relative;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.timeline-empty {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 28px 0;
+}
+.timeline-event {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 9px 0;
+  align-items: flex-start;
+}
+.timeline-event:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 34px;
+  bottom: -9px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--border) 60%, transparent);
+}
+.timeline-icon {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  margin-top: 2px;
+  border: 1px solid var(--border);
+}
+.timeline-icon-comment { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.timeline-icon-email_sent { background: var(--info-bg); color: var(--info); border-color: var(--info); }
+.timeline-icon-note_added { background: var(--warning-bg); color: var(--warning); border-color: var(--warning); }
+.timeline-icon-note_removed { background: var(--skipped-bg); color: var(--text-muted); }
+.timeline-icon-muted { background: var(--warning-bg); color: var(--warning); border-color: var(--warning); }
+.timeline-icon-unmuted { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+.timeline-icon-viewed { background: var(--bg-elevated); color: var(--text-muted); }
+.timeline-body {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+.timeline-event:hover .timeline-body { background: var(--bg-inset); }
+.timeline-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+.timeline-user {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.timeline-type {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  background: var(--bg-elevated);
+  padding: 1px 7px;
+  border-radius: 8px;
+}
+.timeline-time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-left: auto;
+  white-space: nowrap;
+}
+.timeline-text {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+}
+.timeline-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.timeline-pager-info {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.timeline-pager-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.timeline-pager-btn:hover { background: var(--accent-bg); border-color: var(--accent); }
 </style>
 </head>
 <body>
 {% load monitor_extras %}
 
 <div class="header">
-  <div class="header-row">
-    <div class="brand">
-      <span class="mark">&#9670;</span>
-      <h1>WIS2 Global Telemetry</h1>
-      <span class="subtitle">Incident Detail</span>
-    </div>
-    <div class="header-right">
-      <span class="header-time">{{ alert.event_time|date:"Y-m-d H:i:s" }} UTC</span>
-    </div>
+  <div class="brand">
+    <span class="mark">&#9670;</span>
+    <h1>WIS2 Global Telemetry</h1>
+    <span class="subtitle">Incident Detail</span>
   </div>
-  <div class="signal-trace signal-{{ alert.severity|lower }}">
-    <svg viewBox="0 0 800 18" preserveAspectRatio="none">
-      <path d="M0,9 L60,9 L72,2 L84,16 L96,4 L108,14 L120,9 L220,9 L232,2 L244,16 L256,4 L268,14 L280,9 L420,9 L432,1 L444,17 L456,3 L468,15 L480,9 L620,9 L632,2 L644,16 L656,4 L668,14 L680,9 L800,9" />
-    </svg>
+  <div class="header-right">
+    <a href="{% url 'dashboard' %}" class="nav-link">Dashboard</a>
+    <a href="{% url 'monitor_alerts' %}" class="nav-link">Monitor Alerts</a>
+    <div class="find-alert" style="position:relative;">
+      <input type="text" id="findAlertInput" placeholder="Search by Alert ID" onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
+      <button class="fa-btn" onclick="findAlert()">Find</button>
+    </div>
+    <button type="button" class="menu-btn" id="menuBtn" aria-label="Menu">&#9776;</button>
   </div>
 </div>
 
-<div class="container">
-  <a href="{% url 'dashboard' %}" class="back-link">
-    <span class="arrow">&#8592;</span> Dashboard
-  </a>
+<div class="side-menu-overlay" id="sideMenuOverlay"></div>
+<div class="side-menu" id="sideMenu">
+  <div class="sm-header">
+    <div class="sm-user">
+      <div class="sm-avatar">{{ user.get_short_name|default:user.username|make_list|first|upper }}</div>
+      <div>
+        <div class="sm-greeting">Hello</div>
+        <div class="sm-name">{{ user.get_short_name|default:user.username }}</div>
+      </div>
+    </div>
+    <button type="button" class="sm-close" id="sideMenuClose">&times;</button>
+  </div>
+  <div class="sm-body">
+    <div class="sm-section-label">Preferences</div>
+    <button type="button" class="sm-item" id="themeToggle">
+      <span class="sm-icon">&#9681;</span>
+      <span>Toggle Theme</span>
+    </button>
+    <div class="sm-section-label">Account</div>
+    <a href="{% url 'account' %}" class="sm-item">
+      <span class="sm-icon">&#9679;</span>
+      <span>Account</span>
+    </a>
+  </div>
+  <div class="sm-footer">
+    <form method="post" action="{% url 'logout' %}" style="margin:0;">
+      {% csrf_token %}
+      <button type="submit" class="sm-item sm-danger">
+        <span class="sm-icon">&#9099;</span>
+        <span>Logout</span>
+      </button>
+    </form>
+  </div>
+</div>
 
-  <div class="card">
+<div id="notes-banner" class="notes-banner" style="display:none"></div>
+
+<div class="container">
+  <div class="card hero-card hero-card-{{ alert.severity|lower }}">
     <div class="card-body">
       <div class="hero">
         <div class="hero-rail hero-rail-{{ alert.severity|lower }}"></div>
         <div class="hero-body">
           <div class="hero-top">
             <span class="hero-sev-pill hero-sev-pill-{{ alert.severity|lower }}">{{ alert.severity }}</span>
-            {% if alert.incident_hash %}
+          </div>
+          <div class="hero-title">{{ alert.display_title|default:alert.title|default:"Untitled Alert" }}</div>
+          <div class="hero-byline">
+            <span class="hero-label">Title:</span>
+            <span class="hero-value">{{ alert.title|default:"Untitled Alert" }}</span>
+            {% if alert.subject %}
+            <span class="hero-subject">{{ alert.subject }}</span>
             {% endif %}
           </div>
-          <div class="hero-title">{{ alert.title|default:"Untitled Alert" }}</div>
-          <div class="hero-byline">{{ alert.subject }}</div>
+          <div class="hero-id-line">
+            <span class="hero-label">ID:</span>
+            <span class="hero-id-value" data-full="{{ alert.id }}">{{ alert.id }}</span>
+            <span class="id-copy-feedback">Copied!</span>
+          </div>
 
           <div class="meta-grid">
             <div class="meta-item">
-              <span class="meta-label">ID</span>
-              <span class="meta-value meta-copy" data-full="{{ alert.id }}">{{ alert.id|truncatechars:16 }} <span class="copy-feedback">Copied!</span></span>
+              <span class="meta-label">Node</span>
+              <span class="meta-value">{{ alert.node|default:"&mdash;" }}</span>
             </div>
             <div class="meta-item">
               <span class="meta-label">Source</span>
@@ -1030,17 +1518,50 @@ body::after {
               <span class="meta-value">{{ alert.subtype }}</span>
             </div>
             {% endif %}
+            {% if alert.channel %}
             <div class="meta-item">
               <span class="meta-label">Channel</span>
-              <span class="meta-value">{{ alert.channel|default:"&mdash;" }}</span>
+              <span class="meta-value">{{ alert.channel }}</span>
             </div>
-            <div class="meta-item">
-              <span class="meta-label">Spec</span>
-              <span class="meta-value">{{ alert.specversion }}</span>
-            </div>
+            {% endif %}
           </div>
+
+          <button type="button" class="email-btn" id="emailBtn">&#9993; Email Responsible</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="email-overlay" id="emailOverlay"></div>
+  <div class="email-modal" id="emailModal">
+    <div class="email-modal-header">
+      <span>Email Responsible</span>
+      <button type="button" class="email-modal-close" id="emailModalClose">&times;</button>
+    </div>
+    <div class="email-modal-body">
+      {% if node_responsibles %}
+      <div class="email-field">
+        <label class="email-label" for="emailResponsibleSelect">Responsible</label>
+        <select id="emailResponsibleSelect" class="email-select">
+          <option value="">Select a responsible person...</option>
+          {% for r in node_responsibles %}
+          <option value="{{ r.id }}">{{ r.name }} &lt;{{ r.email }}&gt;</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="email-field">
+        <label class="email-label" for="emailNote">Note (optional)</label>
+        <textarea id="emailNote" class="email-textarea" rows="4" placeholder="Add a note for the recipient..."></textarea>
+      </div>
+      {% else %}
+      <div class="email-no-responsibles">This node has no responsible. Please contact the administrator.</div>
+      {% endif %}
+    </div>
+    <div class="email-modal-footer">
+      <button type="button" class="email-btn-cancel" id="emailCancel">Cancel</button>
+      {% if node_responsibles %}
+      <button type="button" class="email-btn-send" id="emailSendBtn">Send Email</button>
+      {% endif %}
     </div>
   </div>
 
@@ -1053,22 +1574,31 @@ body::after {
   </div>
   {% endif %}
 
+  {% if tests_list or summary_dict or alert.wnm or alert.errors %}
   <div class="card">
     <div class="tabs-header" id="tabs-header">
+      {% if tests_list %}
       <button class="tab-btn active" data-tab="tests">
         Tests
-        {% if tests_list %}<span class="tab-count">{{ tests_list|length }}</span>{% endif %}
+        <span class="tab-count">{{ tests_list|length }}</span>
       </button>
+      {% endif %}
+      {% if summary_dict %}
       <button class="tab-btn" data-tab="summary">Summary</button>
+      {% endif %}
+      {% if alert.wnm %}
       <button class="tab-btn" data-tab="wnm">WNM</button>
+      {% endif %}
+      {% if alert.errors %}
       <button class="tab-btn" data-tab="errors">
         Errors
-        {% if alert.errors %}<span class="tab-count tab-count-alert">!</span>{% endif %}
+        <span class="tab-count tab-count-alert">!</span>
       </button>
+      {% endif %}
     </div>
     <div class="card-body">
+      {% if tests_list %}
       <div class="tab-pane active" id="tab-tests">
-        {% if tests_list %}
         <div class="test-grid">
           {% for test in tests_list %}
           {% with status=test.status|default:test.code|default:"UNKNOWN"|upper %}
@@ -1084,13 +1614,11 @@ body::after {
           {% endwith %}
           {% endfor %}
         </div>
-        {% else %}
-        <div class="empty-val">No test results.</div>
-        {% endif %}
       </div>
+      {% endif %}
 
+      {% if summary_dict %}
       <div class="tab-pane" id="tab-summary">
-        {% if summary_dict %}
         <div class="summary-grid">
           {% for key, val in summary_dict.items %}
           <div class="summary-stat summary-stat-{{ key|lower }}">
@@ -1099,28 +1627,23 @@ body::after {
           </div>
           {% endfor %}
         </div>
-        {% else %}
-        <div class="empty-val">No summary data.</div>
-        {% endif %}
       </div>
+      {% endif %}
 
+      {% if alert.wnm %}
       <div class="tab-pane" id="tab-wnm">
-        {% if alert.wnm %}
         {{ alert.wnm|render_wnm }}
-        {% else %}
-        <div class="empty-val">No WNM data.</div>
-        {% endif %}
       </div>
+      {% endif %}
 
+      {% if alert.errors %}
       <div class="tab-pane" id="tab-errors">
-        {% if alert.errors %}
         {{ alert.errors|render_errors }}
-        {% else %}
-        <div class="empty-val">No errors.</div>
-        {% endif %}
       </div>
+      {% endif %}
     </div>
   </div>
+  {% endif %}
   {% if history_page_obj %}
   <div class="card">
     <div class="card-body">
@@ -1134,7 +1657,7 @@ body::after {
           <div class="history-card-inner">
             <span class="history-time">{{ h.event_time|date:"Y-m-d H:i" }}</span>
             <span class="history-sev history-sev-{{ h.severity|lower }}">{{ h.severity }}</span>
-            <span class="history-title">{{ h.title|default:h.event_type }}{% if h.subtype %} <small>({{ h.subtype }})</small>{% endif %}</span>
+            <span class="history-title">{{ h.display_title|default:h.title|default:h.event_type }}{% if h.subtype %} <small>({{ h.subtype }})</small>{% endif %}</span>
           </div>
         </a>
         {% endfor %}
@@ -1165,11 +1688,65 @@ body::after {
     </div>
   </div>
   {% endif %}
+
+  <!-- Activity Section -->
+  <div class="card">
+    <div class="card-body">
+      <div class="activity-header">
+        <div class="activity-header-title">
+          <span class="activity-live-dot"></span>
+          <div class="section-label" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">Activity</div>
+        </div>
+        <div class="activity-header-actions">
+          <button id="muteBtn" class="activity-btn mute-btn" onclick="toggleMute()">&#128263; Mute Incident</button>
+          <button id="unmuteBtn" class="activity-btn unmute-btn" onclick="toggleMute()" style="display:none">Unmute</button>
+        </div>
+      </div>
+
+      <!-- Quick action: add a comment or a timed note -->
+      <div class="activity-compose">
+        <textarea id="activityText" class="activity-textarea" placeholder="Write a comment..." rows="2"></textarea>
+        <div class="activity-compose-actions">
+          <div class="activity-note-opts" style="display:none">
+            <select id="noteDuration" class="activity-select">
+              <option value="300">5 min</option>
+              <option value="600">10 min</option>
+              <option value="1200">20 min</option>
+              <option value="1800">30 min</option>
+              <option value="2700">45 min</option>
+              <option value="3600">1 hour</option>
+              <option value="21600">6 hours</option>
+              <option value="43200">12 hours</option>
+              <option value="86400">1 day</option>
+              <option value="604800">7 days</option>
+            </select>
+          </div>
+          <div class="activity-compose-btns">
+            <button id="noteToggleBtn" class="activity-btn secondary-btn" onclick="toggleNoteMode()">&#128204; Pin as Note</button>
+            <button id="commentSubmitBtn" class="activity-btn primary-btn" onclick="submitComment()">Send &#8594;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Timeline -->
+      <div id="activity-timeline" class="activity-timeline"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
 (function() {
   const tabs = document.querySelectorAll('.tab-btn');
+  // Activate the first visible tab on load
+  const firstTab = tabs[0];
+  if (firstTab) {
+    tabs.forEach(b => b.classList.remove('active'));
+    firstTab.classList.add('active');
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    const firstPane = document.getElementById('tab-' + firstTab.dataset.tab);
+    if (firstPane) firstPane.classList.add('active');
+  }
   tabs.forEach(btn => {
     btn.addEventListener('click', function() {
       const target = this.dataset.tab;
@@ -1180,21 +1757,320 @@ body::after {
     });
   });
 
-  const copyEl = document.querySelector('.meta-copy');
-  if (copyEl) {
-    copyEl.addEventListener('click', async function() {
-      const full = this.dataset.full;
-      try {
-        await navigator.clipboard.writeText(full);
-      } catch {
-        return;
+  /* click-to-copy ID */
+  var idEl = document.querySelector('.hero-id-value');
+  if (idEl) {
+    idEl.addEventListener('click', async function() {
+      var full = this.dataset.full;
+      try { await navigator.clipboard.writeText(full); } catch { return; }
+      var fb = this.parentElement.querySelector('.id-copy-feedback');
+      if (fb) {
+        fb.classList.add('show');
+        setTimeout(function() { fb.classList.remove('show'); }, 2000);
       }
-      const fb = this.querySelector('.copy-feedback');
-      fb.classList.add('show');
-      setTimeout(() => fb.classList.remove('show'), 1200);
     });
   }
-})();
+
+  function showToast(text) {
+    var old = document.getElementById('findAlertMsg');
+    if (old) old.remove();
+    var msg = document.createElement('div');
+    msg.id = 'findAlertMsg';
+    msg.textContent = text;
+    msg.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:8px 16px;z-index:99999;font-family:var(--font-mono);font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+    document.body.appendChild(msg);
+    setTimeout(function(){ msg.remove(); }, 2000);
+  }
+  function findAlert() {
+    var input = document.getElementById('findAlertInput');
+    var id = input.value.trim();
+    if (!id) return;
+    fetch('/api/alert-exists/' + encodeURIComponent(id) + '/')
+      .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
+      .then(function(data) {
+        if (data.exists) { window.location = '/alert/' + encodeURIComponent(id) + '/'; }
+        else { showToast('No alert found with this ID.'); }
+      })
+      .catch(function(){ showToast('Could not check alert. Please try again.'); });
+  }
+
+  /* theme toggle */
+  (function(){
+    var saved = localStorage.getItem('wis2-theme');
+    if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    var btn = document.getElementById('themeToggle');
+    if (btn) {
+      var icon = btn.querySelector('.sm-icon');
+      btn.addEventListener('click', function(){
+        var html = document.documentElement;
+        var isLight = html.getAttribute('data-theme') === 'light';
+        if (isLight) {
+          html.removeAttribute('data-theme');
+          localStorage.setItem('wis2-theme', 'dark');
+          if (icon) icon.textContent = '\u25D1';
+        } else {
+          html.setAttribute('data-theme', 'light');
+          localStorage.setItem('wis2-theme', 'light');
+          if (icon) icon.textContent = '\u25D0';
+        }
+      });
+    }
+  })();
+  /* side menu toggle */
+  (function(){
+    var menuBtn = document.getElementById('menuBtn');
+    var menu = document.getElementById('sideMenu');
+    var overlay = document.getElementById('sideMenuOverlay');
+    var closeBtn = document.getElementById('sideMenuClose');
+    function openMenu() { menu.classList.add('open'); overlay.classList.add('open'); }
+    function closeMenu() { menu.classList.remove('open'); overlay.classList.remove('open'); }
+    if (menuBtn) menuBtn.addEventListener('click', openMenu);
+    if (closeBtn) closeBtn.addEventListener('click', closeMenu);
+    if (overlay) overlay.addEventListener('click', closeMenu);
+  })();
+
+  /* email modal */
+  (function(){
+    var emailBtn = document.getElementById('emailBtn');
+    var modal = document.getElementById('emailModal');
+    var overlay = document.getElementById('emailOverlay');
+    var closeBtn = document.getElementById('emailModalClose');
+    var cancelBtn = document.getElementById('emailCancel');
+    var sendBtn = document.getElementById('emailSendBtn');
+    var select = document.getElementById('emailResponsibleSelect');
+    var note = document.getElementById('emailNote');
+    function openModal() { modal.classList.add('open'); overlay.classList.add('open'); }
+    function closeModal() { modal.classList.remove('open'); overlay.classList.remove('open'); }
+    if (emailBtn) emailBtn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (overlay) overlay.addEventListener('click', closeModal);
+    if (sendBtn) {
+      sendBtn.addEventListener('click', function(){
+        if (!select || !select.value) return;
+        sendBtn.disabled = true;
+        var oldStatus = modal.querySelector('.email-status');
+        if (oldStatus) oldStatus.remove();
+        fetch('{% url "email_responsible" alert.id %}', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+          body: JSON.stringify({responsible_id: select.value, note: note ? note.value : ''})
+        }).then(function(r){
+          if (r.ok) {
+            location.reload();
+          } else {
+            var s = document.createElement('div');
+            s.className = 'email-status error';
+            s.textContent = 'Failed to send email.';
+            modal.querySelector('.email-modal-body').prepend(s);
+          }
+          sendBtn.disabled = false;
+        })['catch'](function(){
+          var s = document.createElement('div');
+          s.className = 'email-status error';
+          s.textContent = 'Network error.';
+          modal.querySelector('.email-modal-body').prepend(s);
+          sendBtn.disabled = false;
+        });
+      });
+    }
+  })();
+
+  })();
+
+  /* --- Activity / Incident Collaboration --- */
+  var activityAlertId = '{{ alert.id }}';
+  var isNoteMode = false;
+  var activityOffset = 0;
+  var activityLimit = 10;
+
+  function fetchActivity() {
+    fetch('/alert/' + activityAlertId + '/activity/?offset=' + activityOffset + '&limit=' + activityLimit)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        renderNotes(data.notes);
+        renderTimeline(data.events, data.total, data.offset, data.limit);
+        renderMute(data.muted_until);
+      });
+  }
+
+  function nextPage() {
+    activityOffset += activityLimit;
+    fetchActivity();
+  }
+  function prevPage() {
+    activityOffset = Math.max(0, activityOffset - activityLimit);
+    fetchActivity();
+  }
+
+  function renderNotes(notes) {
+    var banner = document.getElementById('notes-banner');
+    if (!banner) return;
+    if (!notes || notes.length === 0) {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+      return;
+    }
+    banner.style.display = 'block';
+    banner.innerHTML = '<div class="note-item" style="font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--warning);border-bottom:1px solid rgba(219,185,62,0.3);padding-bottom:6px;margin-bottom:6px">Active Notes</div>';
+    notes.forEach(function(n) {
+      var div = document.createElement('div');
+      div.className = 'note-item';
+      div.innerHTML =
+        '<span class="note-text">' + escHtml(n.text) + '</span>' +
+        '<span class="note-meta">' + n.user_full + ' \u2022 expires ' + n.expires_at.slice(0, 19).replace('T', ' ') + '</span>' +
+        '<button class="note-dismiss" onclick="dismissNote(' + n.id + ')" title="Remove note">&times;</button>';
+      banner.appendChild(div);
+    });
+  }
+
+  function renderTimeline(events, total, offset, limit) {
+    var el = document.getElementById('activity-timeline');
+    if (!el) return;
+    if (!events || events.length === 0) {
+      el.innerHTML = '<div class="timeline-empty">No activity yet.</div>';
+      return;
+    }
+    var html = '';
+    events.forEach(function(e) {
+      var icon = '&#9997;';
+      if (e.event_type === 'email_sent') icon = '&#9993;';
+      else if (e.event_type === 'note_added') icon = '&#128204;';
+      else if (e.event_type === 'note_removed') icon = '&#128465;';
+      else if (e.event_type === 'muted') icon = '&#128263;';
+      else if (e.event_type === 'unmuted') icon = '&#128264;';
+      else if (e.event_type === 'viewed') icon = '&#128065;';
+      var typeLabel = e.event_type.replace(/_/g, ' ');
+      html +=
+        '<div class="timeline-event">' +
+        '<div class="timeline-icon timeline-icon-' + e.event_type + '">' + icon + '</div>' +
+        '<div class="timeline-body">' +
+        '<div class="timeline-header">' +
+        '<span class="timeline-user">' + escHtml(e.user_full) + '</span>' +
+        '<span class="timeline-type">' + typeLabel + '</span>' +
+        '<span class="timeline-time">' + e.created_at.slice(0, 19).replace('T', ' ') + '</span>' +
+        '</div>';
+      if (e.text) {
+        html += '<div class="timeline-text">' + escHtml(e.text) + '</div>';
+      }
+      html += '</div></div>';
+    });
+    var showingEnd = Math.min(offset + limit, total);
+    var pager = '';
+    if (total > limit) {
+      pager = '<div class="timeline-pager">' +
+        '<span class="timeline-pager-info">' + (offset + 1) + '\u2013' + showingEnd + ' of ' + total + '</span>' +
+        (offset > 0 ? '<button class="timeline-pager-btn" onclick="prevPage()">\u2190 Prev</button>' : '') +
+        (showingEnd < total ? '<button class="timeline-pager-btn" onclick="nextPage()">Next \u2192</button>' : '') +
+        '</div>';
+    }
+    el.innerHTML = html + pager;
+  }
+
+  function renderMute(mutedUntil) {
+    var muteBtn = document.getElementById('muteBtn');
+    var unmuteBtn = document.getElementById('unmuteBtn');
+    if (!muteBtn || !unmuteBtn) return;
+    if (mutedUntil) {
+      muteBtn.style.display = 'none';
+      unmuteBtn.style.display = '';
+      unmuteBtn.textContent = 'Unmute (until ' + mutedUntil.slice(0, 19).replace('T', ' ') + ')';
+    } else {
+      muteBtn.style.display = '';
+      unmuteBtn.style.display = 'none';
+    }
+  }
+
+  function toggleMute() {
+    var muteBtn = document.getElementById('muteBtn');
+    var isMuted = muteBtn.style.display === 'none';
+    if (isMuted) {
+      fetch('/alert/' + activityAlertId + '/unmute/', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
+        .then(function(r) { return r.json(); })
+        .then(function() { fetchActivity(); });
+    } else {
+      var d = prompt('Mute duration:\n1 = 1 hour\n6 = 6 hours\n12 = 12 hours\n24 = 1 day\n168 = 7 days', '24');
+      if (!d) return;
+      var duration = parseInt(d, 10);
+      if (isNaN(duration) || duration < 1) return;
+      fetch('/alert/' + activityAlertId + '/mute/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+        body: JSON.stringify({duration: duration * 3600})
+      }).then(function(r) { return r.json(); }).then(function() { fetchActivity(); });
+    }
+  }
+
+  function toggleNoteMode() {
+    isNoteMode = !isNoteMode;
+    var btn = document.getElementById('noteToggleBtn');
+    var opts = document.querySelector('.activity-note-opts');
+    var textarea = document.getElementById('activityText');
+    if (isNoteMode) {
+      btn.classList.add('active-note');
+      btn.textContent = 'Writing Note...';
+      opts.style.display = 'flex';
+      textarea.placeholder = 'Write a timed note...';
+    } else {
+      btn.classList.remove('active-note');
+      btn.textContent = 'Pin as Note';
+      opts.style.display = 'none';
+      textarea.placeholder = 'Write a comment...';
+    }
+  }
+
+  function submitComment() {
+    var textarea = document.getElementById('activityText');
+    var text = textarea.value.trim();
+    if (!text) return;
+    var url, body;
+    if (isNoteMode) {
+      var duration = document.getElementById('noteDuration').value;
+      url = '/alert/' + activityAlertId + '/note/';
+      body = JSON.stringify({text: text, duration: duration});
+    } else {
+      url = '/alert/' + activityAlertId + '/comment/';
+      body = JSON.stringify({text: text});
+    }
+    var btn = document.getElementById('commentSubmitBtn');
+    btn.disabled = true;
+    fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+      body: body
+    }).then(function(r) {
+      btn.disabled = false;
+      if (r.ok) {
+        textarea.value = '';
+        if (isNoteMode) toggleNoteMode();
+        fetchActivity();
+      } else {
+        showToast('Failed to submit.');
+      }
+    })['catch'](function() {
+      btn.disabled = false;
+      showToast('Network error.');
+    });
+  }
+
+  function dismissNote(noteId) {
+    fetch('/alert/' + activityAlertId + '/note/' + noteId + '/remove/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    }).then(function(r) {
+      if (r.ok) fetchActivity();
+      else showToast('Failed to dismiss note.');
+    })['catch'](function() { showToast('Network error.'); });
+  }
+
+  function escHtml(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  fetchActivity();
 </script>
 </body>
 </html>

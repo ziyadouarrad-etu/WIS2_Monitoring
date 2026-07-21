@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import logging
 import hashlib
 import uuid
+import re
 
 
 # =====================================================================
@@ -42,7 +43,7 @@ class ColoredFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-logger = logging.getLogger("WIS2_Node")
+logger = logging.getLogger("WIS2_Ingestion")
 logger.setLevel(logging.INFO)
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(ColoredFormatter())
@@ -61,7 +62,7 @@ TOPIC = "monitor/a/wis2/#"
 
 DB_CONFIG = {
     "dbname": "wis2_alerts",
-    "user": "wis2_admin",
+    "user": "ingestion_user",
     "password": "marocmeteo@",
     "host": "localhost",
     "port":"5432",
@@ -79,6 +80,85 @@ SYSTEM_RUNNING = True
 # =====================================================================
 # MOTEUR D'EXTRACTION & HACHAGE
 # =====================================================================
+def _compute_category(title, description):
+    t = title or ''
+    d = description or ''
+    tl = t.lower()
+    if t.startswith('WCMP2'):
+        return t
+    if t.startswith('Disconnected WIS2 Node'):
+        return 'Node Disconnections'
+    if 'maintenance' in tl or 'template:' in tl:
+        return 'Maintenance'
+    if (t.startswith('The Global Cache can not connect')
+            or 'download errors' in t
+            or 'receiving any data' in t
+            or t.startswith('No cache is receiving data')
+            or t.startswith('No data is received')):
+        return 'Global Cache & Data Flow'
+    if t.startswith('Missing Metadata record') or t.startswith('WIS2 Notification Message not compliant'):
+        return 'Schema & Metadata Validation'
+    if ('context deadline exceeded' in d
+            or (t.startswith('Target ') and ' is down' in t)
+            or 'unexpected EOF' in d
+            or 'GOAWAY' in d
+            or 'client connection lost' in d
+            or 'connection refused' in d
+            or 'HTTP status' in d
+            or 'expected a valid start token' in d
+            or 'connection reset by peer' in d
+            or 'i/o timeout' in d):
+        return 'Endpoint & Protocol Errors'
+    return t
+
+
+def _compute_display_title(title, description):
+    t = title or ''
+    d = description or ''
+    tl = t.lower()
+    # Maintenance Categorization
+    if 'Template:' in t:
+        return 'Maintenance: Template Notice'
+    if 'un-wmo-global-test' in t:
+        return 'Maintenance: Test System'
+    if 'CMA Global Monitor' in t:
+        return 'Maintenance: CMA Global Monitor'
+    if 'CMA Global Services' in t:
+        return 'Maintenance: CMA Global Services'
+    if 'CMA Global Broker' in t:
+        return 'Maintenance: CMA Global Broker'
+    if 'GISC Beijing' in t:
+        return 'Maintenance: GISC Beijing'
+    if 'DWD Service' in t:
+        return 'Maintenance: DWD Services'
+    if 'maintenance' in tl:
+        return 'Maintenance: General'
+    # Endpoint Errors
+    if 'context deadline exceeded' in d:
+        return 'Timeout: context deadline exceeded'
+    if 'unexpected EOF' in d:
+        return 'Network Termination: unexpected EOF'
+    if 'GOAWAY' in d:
+        return 'Network Termination: server sent GOAWAY'
+    if 'client connection lost' in d:
+        return 'Network Termination: client connection lost'
+    if 'connection refused' in d:
+        return 'Connection Refused'
+    if 'HTTP status 502' in d:
+        return 'HTTP Error: 502 Bad Gateway'
+    if 'HTTP status 403' in d:
+        return 'HTTP Error: 403 Forbidden'
+    if 'expected a valid start token' in d:
+        return 'Invalid Response'
+    if 'connection reset by peer' in d:
+        return 'Network Termination: connection reset by peer'
+    if 'i/o timeout' in d:
+        return 'Timeout: i/o timeout'
+    if t.startswith('Target ') and ' is down' in t:
+        return 'Target is down'
+    return t
+
+
 def parse_wmem_record(payload_json):
     """Extrait les champs et génère le hachage cryptographique de l'incident."""
     try:
@@ -88,7 +168,7 @@ def parse_wmem_record(payload_json):
         specversion = payload_json.get("specversion", "1.0")
         event_type = payload_json.get("type", "UNKNOWN_TYPE")
         source = payload_json.get("source")
-        subject = payload_json.get("subject", "UNKNOWN_SUBJECT")
+        node = payload_json.get("subject", "UNKNOWN_NODE")
         event_time = payload_json.get("time")
         datacontenttype = payload_json.get("datacontenttype", "application/json")
         dataschema = payload_json.get("dataschema")
@@ -108,22 +188,26 @@ def parse_wmem_record(payload_json):
         summary = content.get("summary")
         links = data.get("links") or content.get("links") or payload_json.get("links")
 
+        category = _compute_category(title, description)
+        display_title = _compute_display_title(title, description)
+
         # ---------------------------------------------------------
         # GENERATION DU INCIDENT HASH (Règle Métier)
         # ---------------------------------------------------------
         safe_title = title if title else "UNTITLED"
-        safe_subject = subject if subject else "UNKNOWN_SUBJECT"
-        hash_base = f"{safe_title}:{safe_subject}"
+        safe_node = node if node else "UNKNOWN_NODE"
+        hash_base = f"{safe_title}:{safe_node}"
 
         incident_hash = hashlib.sha256(hash_base.encode('utf-8')).hexdigest()
         # ---------------------------------------------------------
 
         return (
-            event_id, specversion, event_type, source, subject, event_time,
+            event_id, specversion, event_type, source, node, event_time,
             datacontenttype, dataschema,
             Json(conforms_to) if conforms_to else None,
             severity, subtype, channel, title, description,
-            incident_hash,  # <-- Injection du hash dans la base de données
+            category, display_title,
+            incident_hash,
             Json(wnm) if wnm else None,
             Json(errors) if errors else None,
             Json(tests) if tests else None,
@@ -168,11 +252,12 @@ def db_writer_worker():
         return
 
     insert_query = """
-                   INSERT INTO alerts (id, specversion, event_type, source, subject, event_time, \
-                                                      datacontenttype, dataschema, conforms_to, severity, subtype, \
-                                                      channel, \
-                                                      title, description, incident_hash, wnm, errors, tests, summary, \
-                                                      links) \
+                   INSERT INTO alerts (id, specversion, event_type, source, node, event_time, \
+                                                       datacontenttype, dataschema, conforms_to, severity, subtype, \
+                                                       channel, \
+                                                       title, description, category, display_title, \
+                                                       incident_hash, wnm, errors, tests, summary, \
+                                                       links) \
                    VALUES %s
                    ON CONFLICT (id) DO NOTHING; \
                    """
@@ -197,7 +282,32 @@ def db_writer_worker():
                 conn, cursor = _connect_db()
                 if conn is None:
                     break
-                # Keep batch for retry on next iteration
+            except psycopg2.errors.ForeignKeyViolation as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                match = re.search(r'Key\s*\(node\)=\s*\(([^)]+)\)', str(e))
+                if match:
+                    missing_node = match.group(1)
+                    logger.info(f"Noeud manquant détecté: '{missing_node}'. Ajout dans la table nodes...")
+                    try:
+                        cursor.execute("INSERT INTO nodes (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (missing_node,))
+                        conn.commit()
+                        logger.info(f"Noeud '{missing_node}' ajouté avec succès. Nouvelle tentative d'insertion du lot...")
+                        continue
+                    except Exception as insert_err:
+                        logger.error(f"Echec d'ajout du noeud '{missing_node}': {insert_err}")
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        batch = []
+                        continue
+                else:
+                    logger.error(f"Impossible d'extraire le noeud manquant de l'erreur: {e}")
+                    batch = []
+                    continue
             except Exception as e:
                 logger.error(f"ECHEC D'INSERTION - Rollback de la transaction: {e}")
                 try:

@@ -28,9 +28,9 @@ Django project configuration:
 Django app providing the web interface:
 - **models.py**: `Alert` model (UUID PK, event metadata, JSON fields for WNM/errors/tests/summary/links)
 - **views.py**: Three views:
-  - `dashboard` — Paginated alert list with filters (severity, type, subject, source, time range, effective type), sorting, and live polling
+  - `dashboard` — Paginated alert list with filters (severity, type, node, source, time range, effective type), sorting, and live polling
   - `api_alerts` — JSON endpoint for real-time polling (supports `since`, `offset`/`limit`, and all dashboard filters)
-  - `alert_detail` — Full incident detail with tabs (Tests, Summary, WNM, Errors) and subject history
+  - `alert_detail` — Full incident detail with tabs (Tests, Summary, WNM, Errors) and node history
 - **templates/**: Dark-themed, responsive HTML with custom CSS (monospace/display fonts, severity-colored indicators, animated live badge)
 - **templatetags/**: Custom template filters for:
   - `event_type_label` — Human-readable event type names
@@ -49,7 +49,7 @@ PostgreSQL database `wis2_alerts` with table `alerts`:
 | `specversion` | varchar(10) | CloudEvents spec version |
 | `event_type` | varchar(255) | WIS2 event type URI |
 | `source` | varchar(255) | Event source identifier |
-| `subject` | varchar(255) | Node/subject identifier |
+| `node` | varchar(255) | Node identifier |
 | `event_time` | timestamptz | Event timestamp (UTC) |
 | `severity` | varchar(50) | CRITICAL, ERROR, WARNING, INFO |
 | `title` | text | Alert title |
@@ -86,7 +86,7 @@ PostgreSQL database `wis2_alerts` with table `alerts`:
 ## Dashboard Features
 
 - **Live polling**: Automatically fetches new alerts every 5 seconds via `/api/alerts/`
-- **Filters**: Severity, type, subject, source, time range, and effective type (down nodes, disconnections, silenced data, ETS reports, global cache, maintenance, quality alerts)
+- **Filters**: Severity, type, node, source, time range, and effective type (down nodes, disconnections, silenced data, ETS reports, global cache, maintenance, quality alerts)
 - **Sorting**: By event time or ingestion time
 - **Pagination**: 10 alerts per page
-- **Incident detail**: Tabbed view (Tests, Summary, WNM, Errors) with subject history pagination
+- **Incident detail**: Tabbed view (Tests, Summary, WNM, Errors) with node history pagination
