@@ -67,8 +67,8 @@ TOPIC = os.environ['MQTT_TOPIC']
 
 DB_CONFIG = {
     "dbname": os.environ['DB_NAME'],
-    "user": os.environ['INGEST_DB_USER'],
-    "password": os.environ['INGEST_DB_PASSWORD'],
+    "user": os.environ['DB_USER'],
+    "password": os.environ['DB_PASSWORD'],
     "host": os.environ.get('DB_HOST', 'localhost'),
     "port": os.environ.get('DB_PORT', '5432'),
 }
