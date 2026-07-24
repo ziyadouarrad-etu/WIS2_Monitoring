@@ -1,6 +1,15 @@
 from django.urls import path
 from django.contrib.auth.views import LoginView, LogoutView
+from django.views.decorators.http import require_POST
+from django.utils.decorators import method_decorator
 from . import views
+
+
+class PostOnlyLogoutView(LogoutView):
+    @method_decorator(require_POST)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
@@ -19,7 +28,7 @@ urlpatterns = [
     path('api/alerts/filter-options/', views.filter_options_api, name='filter_options_api'),
     path('api/alert/<uuid:alert_id>/history/', views.alert_history_fragment, name='alert_history_fragment'),
     path('login/', LoginView.as_view(), name='login'),
-    path('logout/', LogoutView.as_view(next_page='login'), name='logout'),
+    path('logout/', PostOnlyLogoutView.as_view(next_page='login'), name='logout'),
     path('account/', views.account_view, name='account'),
     path('catalogue/', views.alarms_catalogue, name='alarms_catalogue'),
 ]

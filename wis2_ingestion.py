@@ -2,7 +2,11 @@ import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 import json
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import ssl
+import signal
 import threading
 import queue
 import time
@@ -14,6 +18,7 @@ import logging
 import hashlib
 import uuid
 import re
+from pathlib import Path
 
 
 # =====================================================================
@@ -52,64 +57,53 @@ logger.addHandler(console_handler)
 # =====================================================================
 # CONFIGURATION SYSTEME
 # =====================================================================
-BROKER_HOST =  "globalbroker.meteo.fr"
-BROKER_PORT = 443
-TRANSPORT_TYPE = "websockets"
-WEBSOCKET_PATH = "/mqtt"
-USERNAME = "everyone"
-PASSWORD = "everyone"
-TOPIC = "monitor/a/wis2/#"
+BROKER_HOST = os.environ['MQTT_BROKER_HOST']
+BROKER_PORT = int(os.environ['MQTT_BROKER_PORT'])
+TRANSPORT_TYPE = os.environ['MQTT_TRANSPORT']
+WEBSOCKET_PATH = os.environ['MQTT_WEBSOCKET_PATH']
+USERNAME = os.environ['MQTT_USERNAME']
+PASSWORD = os.environ['MQTT_PASSWORD']
+TOPIC = os.environ['MQTT_TOPIC']
 
 DB_CONFIG = {
-    "dbname": "wis2_alerts",
-    "user": "ingestion_user",
-    "password": "marocmeteo@",
-    "host": "localhost",
-    "port":"5432",
+    "dbname": os.environ['DB_NAME'],
+    "user": os.environ['INGEST_DB_USER'],
+    "password": os.environ['INGEST_DB_PASSWORD'],
+    "host": os.environ.get('DB_HOST', 'localhost'),
+    "port": os.environ.get('DB_PORT', '5432'),
 }
 
 BATCH_SIZE = 250
 FLUSH_INTERVAL_SEC = 5
 DB_RECONNECT_DELAY_SEC = 5
-DB_MAX_RECONNECT_ATTEMPTS = 10
+DB_MAX_RECONNECT_ATTEMPTS = 300
+DEAD_LETTER_PATH = Path(__file__).parent / 'dead_letter.jsonl'
 
-telemetry_queue = queue.Queue()
+telemetry_queue = queue.Queue(maxsize=10000)
 SYSTEM_RUNNING = True
+DB_CONNECTED = True
 
 
 # =====================================================================
 # MOTEUR D'EXTRACTION & HACHAGE
 # =====================================================================
-def _compute_category(title, description):
-    t = title or ''
-    d = description or ''
-    tl = t.lower()
-    if t.startswith('WCMP2'):
-        return t
-    if t.startswith('Disconnected WIS2 Node'):
-        return 'Node Disconnections'
-    if 'maintenance' in tl or 'template:' in tl:
-        return 'Maintenance'
-    if (t.startswith('The Global Cache can not connect')
-            or 'download errors' in t
-            or 'receiving any data' in t
-            or t.startswith('No cache is receiving data')
-            or t.startswith('No data is received')):
-        return 'Global Cache & Data Flow'
-    if t.startswith('Missing Metadata record') or t.startswith('WIS2 Notification Message not compliant'):
-        return 'Schema & Metadata Validation'
-    if ('context deadline exceeded' in d
-            or (t.startswith('Target ') and ' is down' in t)
-            or 'unexpected EOF' in d
-            or 'GOAWAY' in d
-            or 'client connection lost' in d
-            or 'connection refused' in d
-            or 'HTTP status' in d
-            or 'expected a valid start token' in d
-            or 'connection reset by peer' in d
-            or 'i/o timeout' in d):
-        return 'Endpoint & Protocol Errors'
-    return t
+
+
+def _write_dead_letter(batch, error):
+    """Write failed batch records to dead_letter.jsonl for manual recovery."""
+    try:
+        with open(DEAD_LETTER_PATH, 'a', encoding='utf-8') as f:
+            for record in batch:
+                entry = {
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                    'error': str(error),
+                    'alert_id': str(record[0]) if record else None,
+                }
+                f.write(json.dumps(entry) + '\n')
+        logger.warning(f"DEAD LETTER: {len(batch)} records written to {DEAD_LETTER_PATH}")
+    except Exception as e:
+        logger.error(f"Failed to write dead letter: {e}")
+
 
 
 def _compute_display_title(title, description):
@@ -118,21 +112,21 @@ def _compute_display_title(title, description):
     tl = t.lower()
     # Maintenance Categorization
     if 'Template:' in t:
-        return 'Maintenance: Template Notice'
+        return 'Maintenance'
     if 'un-wmo-global-test' in t:
-        return 'Maintenance: Test System'
+        return 'Maintenance'
     if 'CMA Global Monitor' in t:
-        return 'Maintenance: CMA Global Monitor'
+        return 'Maintenance'
     if 'CMA Global Services' in t:
-        return 'Maintenance: CMA Global Services'
+        return 'Maintenance'
     if 'CMA Global Broker' in t:
-        return 'Maintenance: CMA Global Broker'
+        return 'Maintenance'
     if 'GISC Beijing' in t:
-        return 'Maintenance: GISC Beijing'
+        return 'Maintenance'
     if 'DWD Service' in t:
-        return 'Maintenance: DWD Services'
+        return 'Maintenance'
     if 'maintenance' in tl:
-        return 'Maintenance: General'
+        return 'Maintenance'
     # Endpoint Errors
     if 'context deadline exceeded' in d:
         return 'Timeout: context deadline exceeded'
@@ -188,7 +182,6 @@ def parse_wmem_record(payload_json):
         summary = content.get("summary")
         links = data.get("links") or content.get("links") or payload_json.get("links")
 
-        category = _compute_category(title, description)
         display_title = _compute_display_title(title, description)
 
         # ---------------------------------------------------------
@@ -206,7 +199,7 @@ def parse_wmem_record(payload_json):
             datacontenttype, dataschema,
             Json(conforms_to) if conforms_to else None,
             severity, subtype, channel, title, description,
-            category, display_title,
+            display_title,
             incident_hash,
             Json(wnm) if wnm else None,
             Json(errors) if errors else None,
@@ -239,6 +232,8 @@ def _connect_db():
             if attempt < DB_MAX_RECONNECT_ATTEMPTS:
                 time.sleep(DB_RECONNECT_DELAY_SEC)
     logger.critical("Nombre maximal de tentatives de reconnexion atteint. Arrêt du pipeline.")
+    global DB_CONNECTED
+    DB_CONNECTED = False
     SYSTEM_RUNNING = False
     return None, None
 
@@ -255,7 +250,7 @@ def db_writer_worker():
                    INSERT INTO alerts (id, specversion, event_type, source, node, event_time, \
                                                        datacontenttype, dataschema, conforms_to, severity, subtype, \
                                                        channel, \
-                                                       title, description, category, display_title, \
+                                                       title, description, display_title, \
                                                        incident_hash, wnm, errors, tests, summary, \
                                                        links) \
                    VALUES %s
@@ -273,7 +268,19 @@ def db_writer_worker():
 
         if len(batch) >= BATCH_SIZE or (len(batch) > 0 and telemetry_queue.empty()):
             try:
+                uuids = [str(r[0]) for r in batch]
                 execute_values(cursor, insert_query, batch)
+                NOTIFY_LIMIT = 7900
+                chunk, chunk_size = [], 2  # start at 2 for []
+                for uid in uuids:
+                    entry_len = len(uid) + 2 + (1 if chunk else 0)
+                    if chunk and chunk_size + entry_len > NOTIFY_LIMIT:
+                        cursor.execute("SELECT pg_notify('wis2_alerts_updates', %s)", (json.dumps(chunk),))
+                        chunk, chunk_size = [], 2
+                    chunk.append(uid)
+                    chunk_size += entry_len
+                if chunk:
+                    cursor.execute("SELECT pg_notify('wis2_alerts_updates', %s)", (json.dumps(chunk),))
                 conn.commit()
                 logger.info(f"Sync DB réussi: {len(batch)} logs insérés. (File d'attente: {telemetry_queue.qsize()})")
                 batch = []
@@ -281,6 +288,8 @@ def db_writer_worker():
                 logger.warning(f"Connexion DB perdue: {e}. Tentative de reconnexion...")
                 conn, cursor = _connect_db()
                 if conn is None:
+                    if batch:
+                        _write_dead_letter(batch, 'DB connection permanently lost')
                     break
             except psycopg2.errors.ForeignKeyViolation as e:
                 try:
@@ -302,10 +311,12 @@ def db_writer_worker():
                             conn.rollback()
                         except Exception:
                             pass
+                        _write_dead_letter(batch, insert_err)
                         batch = []
                         continue
                 else:
                     logger.error(f"Impossible d'extraire le noeud manquant de l'erreur: {e}")
+                    _write_dead_letter(batch, e)
                     batch = []
                     continue
             except Exception as e:
@@ -314,6 +325,7 @@ def db_writer_worker():
                     conn.rollback()
                 except Exception:
                     pass
+                _write_dead_letter(batch, e)
                 batch = []
 
     if conn:
@@ -336,6 +348,8 @@ def on_connect(client, userdata, flags, reason_code, properties):
 
 def on_message(client, userdata, msg):
     try:
+        if not DB_CONNECTED:
+            return
         payload_str = msg.payload.decode('utf-8')
         payload_json = json.loads(payload_str)
 
@@ -385,6 +399,12 @@ def start_ingestion_node():
     client.username_pw_set(USERNAME, PASSWORD)
     client.tls_set(cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLS)
     client.ws_set_options(path=WEBSOCKET_PATH)
+
+    def _handle_sigterm(signum, frame):
+        logger.warning("SIGTERM reçu. Arrêt en cours...")
+        client.disconnect()
+
+    signal.signal(signal.SIGTERM, _handle_sigterm)
 
     try:
         logger.info("Exécution du handshake WebSocket...")

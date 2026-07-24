@@ -1,22 +1,44 @@
 from django.contrib import admin
-from .models import Alert, Profile, NodeResponsible, NodeResponsibleMapping
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
+from .models import Profile, NodeResponsible, NodeResponsibleMapping, Node
 
 
-class AlertAdmin(admin.ModelAdmin):
-    list_display = ('event_time', 'severity', 'event_type', 'source', 'node', 'title')
-    list_filter = ('severity', 'event_type', 'source', 'node', 'event_time')
-    search_fields = ('title', 'description', 'source', 'node')
-    ordering = ('-event_time',)
-    date_hierarchy = 'event_time'
-
-
-class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'allowed_nodes_list')
+class ProfileInline(admin.StackedInline):
+    model = Profile
     filter_horizontal = ('allowed_nodes',)
+    max_num = 1
+    fields = ('allowed_nodes',)
 
-    def allowed_nodes_list(self, obj):
-        return ", ".join(n.name for n in obj.allowed_nodes.all())
-    allowed_nodes_list.short_description = 'Allowed Nodes'
+    def get_extra(self, request, obj=None, **kwargs):
+        return 0 if obj else 1
+
+
+class UserAdmin(BaseUserAdmin):
+    inlines = [ProfileInline]
+    add_fieldsets = (
+        (None, {
+            'fields': ('username', 'password1', 'password2'),
+        }),
+        ('Permissions', {
+            'fields': ('groups',),
+        }),
+    )
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if isinstance(instance, Profile) and not instance.pk:
+                existing = Profile.objects.filter(user=instance.user).first()
+                if existing:
+                    instance.pk = existing.pk
+                    instance.user = existing.user
+            instance.save()
+        formset.save_m2m()
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)
 
 
 class NodeResponsibleMappingInline(admin.TabularInline):
@@ -30,16 +52,10 @@ class NodeResponsibleAdmin(admin.ModelAdmin):
     search_fields = ('name', 'email')
     inlines = [NodeResponsibleMappingInline]
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related('noderesponsiblemapping_set__node')
+
     def assigned_nodes(self, obj):
-        return ", ".join(m.node.name for m in obj.noderesponsiblemapping_set.select_related('node').all())
+        mappings = obj.noderesponsiblemapping_set.all()
+        return ", ".join(m.node.name for m in mappings)
     assigned_nodes.short_description = 'Assigned Nodes'
-
-
-@admin.register(NodeResponsibleMapping)
-class NodeResponsibleMappingAdmin(admin.ModelAdmin):
-    list_display = ('node', 'responsible', 'assigned_at')
-    list_filter = ('node', 'responsible')
-
-
-admin.site.register(Alert, AlertAdmin)
-admin.site.register(Profile, ProfileAdmin)

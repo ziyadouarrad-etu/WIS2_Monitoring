@@ -1,92 +1,267 @@
 # WIS2 Global Telemetry Monitor
 
-A real-time telemetry monitoring system for the **WIS2 (WMO Information System 2)** global infrastructure. The system ingests WIS2 Notification Messages (WNM) from a MQTT broker, stores them in PostgreSQL, and provides a web dashboard for visualization, filtering, and incident analysis.
+Real-time alert monitoring system for the **WMO Information System 2 (WIS2)** global infrastructure. Ingests WIS2 Notification Messages (WNMs) from the global MQTT broker, stores them in PostgreSQL, and streams them to a web dashboard via WebSockets.
 
 ## Architecture
 
 ```
-MQTT Global Broker ──► wis2_ingestion.py ──► PostgreSQL ──► Django Web App
-(WebSocket/MQTT)         (Python daemon)     (Database)     (Dashboard + API)
+┌─────────────────────────────┐
+│  WIS2 Global Broker         │  globalbroker.meteo.fr:443
+│  MQTT over WebSocket (TLS)  │  topic: monitor/a/wis2/#
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│  wis2_ingestion.py          │  Standalone daemon (MQTT client)
+│  - Parses CloudEvents/WNMs  │  Two threads: MQTT loop + DB writer
+│  - Batch inserts (250/5s)   │
+│  - Sends pg_notify on insert│
+└──────────────┬──────────────┘
+               │ INSERT + NOTIFY
+               ▼
+┌─────────────────────────────┐
+│  PostgreSQL                 │  Database: wis2_alerts
+│  - alerts table             │  Channel: wis2_alerts_updates
+│  - nodes table              │
+└───────┬──────────┬──────────┘
+        │          │
+        │          ▼  LISTEN wis2_alerts_updates
+        │  ┌───────────────────────┐
+        │  │ telemetry/listeners.py│  Standalone process (wis2_listener.py)
+        │  │ - Receives NOTIFY     │  Fetches full rows by UUID
+        │  │ - Hydrates alerts     │  Broadcasts via channel_layer.group_send()
+        │  └──────────┬────────────┘
+        │             │ group_send('alerts_live')
+        │             ▼
+        │  ┌───────────────────────┐
+        │  │ channels_postgres     │  PostgresChannelLayer (NOTIFY/LISTEN)
+        │  │ Channel Layer         │  Internal message + group tables
+        │  └──────────┬────────────┘
+        │             │
+        │             ▼
+        │  ┌───────────────────────┐
+        │  │ telemetry/consumers.py│  AlertConsumer (WebSocket)
+        │  │ - RBAC filtering      │  Pushes to connected clients
+        │  │ - admin sees all      │
+        │  │ - users see own nodes │
+        │  └──────────┬────────────┘
+        │             │
+        ▼             ▼
+┌─────────────────────────────┐
+│  Django (Daphne ASGI)       │  HTTP + WebSocket
+│  /                          │  Dashboard, alerts, incident mgmt
+│  /ws/alerts/                │  Live WebSocket stream
+└─────────────────────────────┘
 ```
 
-## Components
+## Data Pipeline
 
-### `wis2_ingestion.py`
-Standalone Python daemon that:
-- Connects to the WIS2 Global Broker (`globalbroker.meteo.fr`) via MQTT over WebSockets (TLS)
-- Subscribes to `monitor/a/wis2/#` topics
-- Parses incoming CloudEvents/WIS2 Notification Messages
-- Batches inserts into PostgreSQL (every 250 records or 5 seconds)
-- Runs the MQTT loop and DB writer on separate threads
+### Stage 1: MQTT Ingestion (`wis2_ingestion.py`)
 
-### `wis2_monitor/`
-Django project configuration:
-- **settings.py**: PostgreSQL connection, Django 6.0 config, `telemetry` app, in-memory cache
-- **urls.py**: Routes `/admin/` to Django Admin and `/` to the telemetry app
+- Connects to WIS2 Global Broker via MQTT/WebSocket with TLS
+- Subscribes to `monitor/a/wis2/#` (all WIS2 notifications)
+- Parses CloudEvents-compliant payloads: extracts `id`, `type`, `source`, `subject` (node), `severity`, `title`, `description`, `wnm`, `errors`, `tests`, `summary`, `links`
+- Computes a `display_title` by categorizing known patterns (maintenance, timeouts, HTTP errors, etc.)
+- Generates an `incident_hash` (SHA-256 of `title:node`) for grouping related alerts
+- Batches inserts every **250 records or 5 seconds** using `psycopg2.extras.execute_values`
+- After each batch, sends `pg_notify('wis2_alerts_updates', <uuid_list>)` to wake the listener
+- Handles `ForeignKeyViolation` by auto-creating missing nodes
+- Writes failed batches to `dead_letter.jsonl` for recovery
 
-### `telemetry/`
-Django app providing the web interface:
-- **models.py**: `Alert` model (UUID PK, event metadata, JSON fields for WNM/errors/tests/summary/links)
-- **views.py**: Three views:
-  - `dashboard` — Paginated alert list with filters (severity, type, node, source, time range, effective type), sorting, and live polling
-  - `api_alerts` — JSON endpoint for real-time polling (supports `since`, `offset`/`limit`, and all dashboard filters)
-  - `alert_detail` — Full incident detail with tabs (Tests, Summary, WNM, Errors) and node history
-- **templates/**: Dark-themed, responsive HTML with custom CSS (monospace/display fonts, severity-colored indicators, animated live badge)
-- **templatetags/**: Custom template filters for:
-  - `event_type_label` — Human-readable event type names
-  - `render_wnm` — Structured WNM tree rendering (identity chips, geometry, links, nested blocks)
-  - `render_errors` — Error card rendering
-- **admin.py**: Django admin with list display/filter/search
-- **migrations/**: Schema + performance indexes (event_time DESC, ingested_at, severity/event_time composite, event_type, partial index on errors)
+### Stage 2: NOTIFY Listener (`telemetry/listeners.py`)
 
-## Database
+- Standalone process (`python wis2_listener.py`)
+- Opens a `psycopg2` connection with `ISOLATION_LEVEL_AUTOCOMMIT` and issues `LISTEN wis2_alerts_updates`
+- On notification: parses UUID payload, fetches full alert rows, and calls `channel_layer.group_send('alerts_live', ...)`
+- On reconnect: runs a catch-up query for any alerts inserted during the offline window
+- Auto-reconnects with backoff on connection loss
 
-PostgreSQL database `wis2_alerts` with table `alerts`:
+### Stage 3: WebSocket Consumer (`telemetry/consumers.py`)
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID | Primary key (from CloudEvents `id`) |
+- `AlertConsumer` (AsyncWebsocketConsumer) at `/ws/alerts/`
+- On connect: joins `alerts_live` group, checks admin status and allowed nodes
+- On `new_alerts` event: filters alerts by user permissions (admin sees all, others see only assigned nodes), sends JSON to client
+- Requires authentication (anonymous connections are rejected)
+
+## Project Structure
+
+```
+PythonProject2/
+├── manage.py
+├── requirements.txt
+├── .env                          # Environment variables (not committed)
+├── .env.example                  # Template for .env
+│
+├── wis2_ingestion.py             # MQTT → PostgreSQL ingestion daemon
+├── wis2_listener.py              # PostgreSQL NOTIFY → WebSocket broadcast
+│
+├── wis2_monitor/                 # Django project config
+│   ├── settings.py               # DB, channels, cache, email config
+│   ├── urls.py                   # Root URL routing
+│   ├── asgi.py                   # ASGI application (Daphne)
+│   └── wsgi.py                   # WSGI fallback
+│
+├── telemetry/                    # Django app
+│   ├── models.py                 # Alert, Node, NodeResponsible, Profile, IncidentEvent, IncidentMute
+│   ├── views.py                  # Dashboard, alert list, detail, incident management, APIs
+│   ├── consumers.py              # WebSocket consumer (AlertConsumer)
+│   ├── listeners.py              # PostgreSQL NOTIFY listener + broadcast logic
+│   ├── routing.py                # WebSocket URL routing
+│   ├── urls.py                   # HTTP URL routing
+│   ├── admin.py                  # Django admin config
+│   ├── templatetags/             # Custom template filters
+│   ├── migrations/               # Schema + indexes
+│   └── templates/                # Dark-themed HTML templates
+│
+└── staticfiles/                  # Collected static assets
+```
+
+## Database Schema
+
+**PostgreSQL** database `wis2_alerts`. Tables are created via SQL migrations (not Django migrations for core tables).
+
+### `alerts` (managed=False — created by SQL migration)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | Primary key (CloudEvents `id`) |
 | `specversion` | varchar(10) | CloudEvents spec version |
 | `event_type` | varchar(255) | WIS2 event type URI |
-| `source` | varchar(255) | Event source identifier |
-| `node` | varchar(255) | Node identifier |
+| `source` | varchar(255) | Event source |
+| `node` | varchar(255) | FK → `nodes.name` |
 | `event_time` | timestamptz | Event timestamp (UTC) |
-| `severity` | varchar(50) | CRITICAL, ERROR, WARNING, INFO |
-| `title` | text | Alert title |
+| `severity` | varchar(50) | CRITICAL / ERROR / WARNING / INFO |
+| `title` | text | Raw alert title |
+| `display_title` | text | Categorized title (Maintenance, Timeout, etc.) |
 | `description` | text | Alert description |
-| `incident_hash` | text | SHA-256 deduplication hash |
+| `incident_hash` | text | SHA-256(`title:node`) — groups related alerts |
 | `wnm` | jsonb | Full WIS2 Notification Message |
 | `errors` | jsonb | Quality/validation errors |
 | `tests` | jsonb | ETS test results |
-| `summary` | jsonb | Test summary (PASSED/FAILED/WARNING/SKIPPED counts) |
+| `summary` | jsonb | Test summary (PASSED/FAILED/WARNING/SKIPPED) |
 | `links` | jsonb | Related resource links |
-| `ingested_at` | timestamptz | Auto-set ingestion timestamp |
+| `ingested_at` | timestamptz | Auto-set on insert |
+
+### `nodes` / `node_responsibles` / `node_responsible_mapping`
+
+Unmanaged tables for node metadata and responsible person assignments. The ingestion daemon auto-creates missing nodes on FK violations.
+
+### `incident_events` / `incident_mutes`
+
+Managed by Django for incident tracking: comments, email logs, notes, mute/unmute, view tracking.
+
+## Role-Based Access Control
+
+- **Admin group**: Sees all alerts, full node list, `is_staff` auto-synced
+- **Regular users**: See only alerts for nodes assigned via `Profile.allowed_nodes` (M2M)
+- WebSocket consumer filters alerts per-user in real time
+- Dashboard filter choices are scoped to user's visible nodes
 
 ## Setup
 
-1. **Prerequisites**: Python 3.13+, PostgreSQL, virtual environment
-2. **Install dependencies**:
-   ```bash
-   pip install django psycopg2 paho-mqtt
-   ```
-3. **Configure database** in `wis2_monitor/settings.py` and `wis2_ingestion.py`
-4. **Run migrations**:
-   ```bash
-   python manage.py migrate
-   ```
-5. **Start the ingestion daemon**:
-   ```bash
-   python wis2_ingestion.py
-   ```
-6. **Start the web server**:
-   ```bash
-   python manage.py runserver
-   ```
+### Prerequisites
 
-## Dashboard Features
+- Python 3.13+
+- PostgreSQL 14+
+- SMTP account (Gmail app password for email notifications)
 
-- **Live polling**: Automatically fetches new alerts every 5 seconds via `/api/alerts/`
-- **Filters**: Severity, type, node, source, time range, and effective type (down nodes, disconnections, silenced data, ETS reports, global cache, maintenance, quality alerts)
-- **Sorting**: By event time or ingestion time
-- **Pagination**: 10 alerts per page
-- **Incident detail**: Tabbed view (Tests, Summary, WNM, Errors) with node history pagination
+### 1. Clone and install
+
+```bash
+git clone <repo-url> && cd PythonProject2
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate    # Linux/macOS
+pip install -r requirements.txt
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your values. Key variables:
+
+```env
+DJANGO_SECRET_KEY=<generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())">
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+
+DB_NAME=wis2_alerts
+DB_USER=wis2_admin
+DB_PASSWORD=<your-password>
+
+INGEST_DB_USER=ingestion_user
+INGEST_DB_PASSWORD=<your-password>
+
+MQTT_BROKER_HOST=globalbroker.meteo.fr
+MQTT_BROKER_PORT=443
+MQTT_TRANSPORT=websockets
+MQTT_WEBSOCKET_PATH=/mqtt
+MQTT_USERNAME=everyone
+MQTT_PASSWORD=everyone
+MQTT_TOPIC=monitor/a/wis2/#
+```
+
+### 3. Initialize database
+
+```sql
+CREATE DATABASE wis2_alerts;
+CREATE USER wis2_admin WITH PASSWORD '<password>';
+CREATE USER ingestion_user WITH PASSWORD '<password>';
+GRANT ALL PRIVILEGES ON DATABASE wis2_alerts TO wis2_admin;
+```
+
+Then run Django migrations:
+
+```bash
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+The `nodes` and `alerts` tables are created by SQL migrations in `telemetry/migrations/`. The ingestion daemon also auto-creates missing nodes on FK violations.
+
+### 4. Start the services
+
+You need **three separate terminals**:
+
+```bash
+# Terminal 1 — MQTT ingestion daemon
+python wis2_ingestion.py
+
+# Terminal 2 — PostgreSQL NOTIFY listener (broadcasts to WebSockets)
+python wis2_listener.py
+
+# Terminal 3 — Django web server (Daphne ASGI)
+python manage.py runserver
+```
+
+The dashboard is available at `http://localhost:8000/`.
+
+## API Endpoints
+
+All endpoints require authentication (`@login_required`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Dashboard (severity counts, urgent alerts, ETS data, charts) |
+| GET | `/monitor_alerts/` | Paginated alert list with filters |
+| GET | `/alert/<uuid>/` | Alert detail (tabs: Tests, Summary, WNM, Errors, Node History) |
+| GET | `/api/alerts/` | JSON alert feed (`?since=&offset=&limit=&severity=&node=&type=`) |
+| GET | `/api/alerts/per-day/` | Daily aggregated chart data (`?days=14&group_by=severity`) |
+| GET | `/api/alerts/filter-options/` | Available filter values for current user |
+| POST | `/alert/<uuid>/comment/` | Add incident comment |
+| POST | `/alert/<uuid>/note/` | Add timed note (`{"text": "...", "duration": 3600}`) |
+| POST | `/alert/<uuid>/mute/` | Mute incident (`{"duration": 7200}`) |
+| POST | `/alert/<uuid>/unmute/` | Unmute incident |
+| POST | `/alert/<uuid>/email/` | Email responsible person (`{"responsible_ids": [...], "note": "..."}`) |
+| GET | `/alert/<uuid>/activity/` | Incident activity feed (paginated) |
+| WS | `/ws/alerts/` | WebSocket — real-time alert stream (JSON) |
+
+## Key Design Decisions
+
+- **No Redis/Celery**: The channel layer uses `channels_postgres` (PostgreSQL NOTIFY/LISTEN) instead of Redis. The ingestion → listener pipeline also uses PostgreSQL NOTIFY directly. This keeps the stack to one database.
+- **Batch inserts with NOTIFY**: The ingestion daemon batches 250 records and sends a single `pg_notify` with the UUID list, keeping the listener lightweight (it only fetches full rows when notified).
+- **Incident hashing**: `SHA-256(title:node)` groups recurring alerts from the same node into a single incident timeline.
+- **Dead letter queue**: Failed batches are written to `dead_letter.jsonl` for manual recovery instead of being dropped.
+- **Separate DB users**: `wis2_admin` for Django/listener, `ingestion_user` for the ingestion daemon (principle of least privilege).

@@ -37,6 +37,7 @@
   --accent: #3ab5ab;
   --accent-bg: rgba(58,181,171,0.12);
   --accent-soft: #8cd4cf;
+  --accent-dim: rgba(58,181,171,0.14);
 
   --radius: 6px;
   --radius-sm: 4px;
@@ -45,7 +46,8 @@
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
 }
-html { zoom: 0.9; }
+html { transform: scale(0.9); transform-origin: 0 0; width: 111.111%; height: 111.111%; }
+body { overflow-x: hidden; padding-top: 68px; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: var(--font-body);
@@ -90,7 +92,7 @@ body::after {
 
 /* ---------- Header ---------- */
 .header {
-  position: sticky; top: 0; z-index: 100;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   background: linear-gradient(180deg, #0e1828 0%, #0a121f 100%);
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
@@ -129,6 +131,15 @@ body::after {
   transition: all 0.15s;
 }
 .nav-link:hover { background: var(--accent); color: #06231f; box-shadow: 0 0 14px rgba(58,181,171,0.35); }
+.btn-back {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--accent); background: var(--accent-dim);
+  border: 1px solid var(--accent); border-radius: 4px;
+  cursor: pointer; padding: 5px 10px; line-height: 1;
+  transition: all 0.15s; text-decoration: none; display: inline-flex;
+  align-items: center; gap: 4px; flex-shrink: 0;
+}
+.btn-back:hover { background: var(--accent); color: #06231f; box-shadow: 0 0 14px rgba(58,181,171,0.35); }
 .find-alert { display: flex; align-items: center; gap: 4px; }
 .find-alert input {
   font-family: var(--font-mono); font-size: 12px; padding: 4px 8px;
@@ -466,6 +477,20 @@ body::after {
   border: 1px solid var(--border); border-radius: 4px; outline: none;
 }
 .email-select:focus, .email-textarea:focus { border-color: var(--accent); }
+.email-resp-list {
+  max-height: 200px; overflow-y: auto; border: 1px solid var(--border);
+  border-radius: 4px; background: var(--bg);
+}
+.email-resp-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s;
+  font-family: var(--font-mono); font-size: 12px; color: var(--text);
+}
+.email-resp-item:last-child { border-bottom: none; }
+.email-resp-item:hover { background: var(--bg-elevated); }
+.email-resp-item input { accent-color: var(--accent); flex-shrink: 0; }
+.email-resp-item label { cursor: pointer; margin: 0; flex: 1; }
+.email-resp-item .resp-email { color: var(--text-muted); font-size: 11px; }
 .email-textarea { resize: vertical; min-height: 60px; }
 .email-no-responsibles {
   font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0;
@@ -1131,6 +1156,7 @@ body::after {
 }
 
 @media (max-width: 768px) {
+  body { padding-top: 100px; }
   .header { height: auto; padding: 14px 16px; flex-direction: column; gap: 10px; align-items: flex-start; }
   .header-right { width: 100%; justify-content: flex-end; }
   .container { padding: 16px 14px 36px; }
@@ -1424,10 +1450,13 @@ body::after {
 {% load monitor_extras %}
 
 <div class="header">
-  <div class="brand">
-    <span class="mark">&#9670;</span>
-    <h1>WIS2 Global Telemetry</h1>
-    <span class="subtitle">Incident Detail</span>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <button type="button" class="btn-back" onclick="window.history.back()" title="Go back">&#8592; Back</button>
+    <div class="brand">
+      <span class="mark">&#9670;</span>
+      <h1>WIS2 Global Telemetry</h1>
+      <span class="subtitle">Incident Detail</span>
+    </div>
   </div>
   <div class="header-right">
     <a href="{% url 'dashboard' %}" class="nav-link">Dashboard</a>
@@ -1547,17 +1576,19 @@ body::after {
     <div class="email-modal-body">
       {% if node_responsibles %}
       <div class="email-field">
-        <label class="email-label" for="emailResponsibleSelect">Responsible</label>
-        <select id="emailResponsibleSelect" class="email-select">
-          <option value="">Select a responsible person...</option>
+        <label class="email-label">Responsible</label>
+        <div class="email-resp-list" id="emailRespList">
           {% for r in node_responsibles %}
-          <option value="{{ r.id }}">{{ r.name }} &lt;{{ r.email }}&gt;</option>
+          <div class="email-resp-item">
+            <input type="checkbox" id="resp_{{ r.id }}" value="{{ r.id }}" checked>
+            <label for="resp_{{ r.id }}">{{ r.name }} <span class="resp-email">&lt;{{ r.email }}&gt;</span></label>
+          </div>
           {% endfor %}
-        </select>
+        </div>
       </div>
       <div class="email-field">
         <label class="email-label" for="emailNote">Note (optional)</label>
-        <textarea id="emailNote" class="email-textarea" rows="4" placeholder="Add a note for the recipient..."></textarea>
+        <textarea id="emailNote" class="email-textarea" rows="4" placeholder="Add a note for the recipients..."></textarea>
       </div>
       {% else %}
       <div class="email-no-responsibles">This node has no responsible. Please contact the administrator.</div>
@@ -1820,7 +1851,6 @@ body::after {
     var closeBtn = document.getElementById('emailModalClose');
     var cancelBtn = document.getElementById('emailCancel');
     var sendBtn = document.getElementById('emailSendBtn');
-    var select = document.getElementById('emailResponsibleSelect');
     var note = document.getElementById('emailNote');
     function openModal() { modal.classList.add('open'); overlay.classList.add('open'); }
     function closeModal() { modal.classList.remove('open'); overlay.classList.remove('open'); }
@@ -1830,14 +1860,16 @@ body::after {
     if (overlay) overlay.addEventListener('click', closeModal);
     if (sendBtn) {
       sendBtn.addEventListener('click', function(){
-        if (!select || !select.value) return;
+        var checked = document.querySelectorAll('#emailRespList input[type=checkbox]:checked');
+        var ids = Array.from(checked).map(function(cb) { return cb.value; });
+        if (ids.length === 0) return;
         sendBtn.disabled = true;
         var oldStatus = modal.querySelector('.email-status');
         if (oldStatus) oldStatus.remove();
         fetch('{% url "email_responsible" alert.id %}', {
           method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-          body: JSON.stringify({responsible_id: select.value, note: note ? note.value : ''})
+          body: JSON.stringify({responsible_ids: ids, note: note ? note.value : ''})
         }).then(function(r){
           if (r.ok) {
             location.reload();

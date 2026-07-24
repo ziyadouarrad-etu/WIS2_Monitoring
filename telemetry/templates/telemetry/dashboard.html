@@ -9,17 +9,10 @@
 {% block header_links %}
 <button type="button" id="windowToggleBtn" style="font-family:var(--font-mono);font-weight:600;border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent);cursor:pointer;text-transform:uppercase;letter-spacing:0.08em;display:flex;align-items:center;gap:6px;transition:all 0.15s;">
   <span id="windowToggleText">
-    {% if time_window == '12h' %}Last 12h{% elif time_window == '24h' %}Last 24h{% elif time_window == 'custom' %}Custom{% else %}All Time{% endif %}
+    {% if time_window == '12h' %}Last 12h{% elif time_window == '24h' %}Last 24h{% else %}All Time{% endif %}
   </span>
   <span style="font-size:8px;">&#9662;</span>
 </button>
-<form method="get" id="windowCustomForm" style="display:{% if time_window == 'custom' %}flex{% else %}none{% endif %};align-items:center;gap:4px;">
-  <input type="datetime-local" name="window_from" value="{{ window_from_display }}" style="font-family:var(--font-mono);border:1px solid var(--border);background:var(--bg);color:var(--text);width:auto;min-width:80px;">
-  <span style="color:var(--text-muted);">→</span>
-  <input type="datetime-local" name="window_to" value="{{ window_to_display }}" style="font-family:var(--font-mono);border:1px solid var(--border);background:var(--bg);color:var(--text);width:auto;min-width:80px;">
-  <input type="hidden" name="window" value="custom">
-  <button type="submit" style="font-family:var(--font-mono);border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent);cursor:pointer;">Go</button>
-</form>
 <a href="{% url 'monitor_alerts' %}" class="nav-link">Monitor Alerts</a>
 <div class="find-alert" style="position:relative;">
   <input type="text" id="findAlertInput" placeholder="Search by Alert ID" onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
@@ -126,77 +119,106 @@ body::before {
   85% { transform: scale(1.01); }
   100% { transform: scale(1); }
 }
-@keyframes sevFlash {
-  0% { background-color: rgba(77,208,196,0); }
-  30% { background-color: rgba(74,186,131,0.25); }
-  100% { background-color: rgba(77,208,196,0); }
+@keyframes sevFlashCritical {
+  0% { background-color: rgba(255,90,90,0); }
+  30% { background-color: rgba(255,90,90,0.25); }
+  100% { background-color: rgba(255,90,90,0); }
 }
-.sev-card.bump {
-  animation: sevBump 0.6s ease, sevFlash 0.8s ease-out;
+@keyframes sevFlashError {
+  0% { background-color: rgba(255,159,67,0); }
+  30% { background-color: rgba(255,159,67,0.25); }
+  100% { background-color: rgba(255,159,67,0); }
 }
+@keyframes sevFlashWarning {
+  0% { background-color: rgba(255,209,102,0); }
+  30% { background-color: rgba(255,209,102,0.25); }
+  100% { background-color: rgba(255,209,102,0); }
+}
+@keyframes sevFlashInfo {
+  0% { background-color: rgba(91,155,213,0); }
+  30% { background-color: rgba(91,155,213,0.25); }
+  100% { background-color: rgba(91,155,213,0); }
+}
+.sev-card.bump.sev-critical { animation: sevBump 0.6s ease, sevFlashCritical 0.8s ease-out; }
+.sev-card.bump.sev-error { animation: sevBump 0.6s ease, sevFlashError 0.8s ease-out; }
+.sev-card.bump.sev-warning { animation: sevBump 0.6s ease, sevFlashWarning 0.8s ease-out; }
+.sev-card.bump.sev-info { animation: sevBump 0.6s ease, sevFlashInfo 0.8s ease-out; }
 
-.cat-cards {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 10px;
-  grid-column: 1 / -1;
-}
-.cat-card {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
+.chart-card {
   background: var(--bg-card);
-  text-decoration: none;
-  color: inherit;
-  transition: all 0.2s;
-  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: visible;
+  margin-bottom: 14px;
 }
-.cat-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-hover);
-}
-.cat-card .cat-count {
+.chart-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
   font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.cat-card .cat-label {
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.chart-btn-group {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.chart-btn {
+  padding: 2px 8px;
+  border: none;
+  background: var(--bg);
+  color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  text-align: center;
-  line-height: 1.2;
+  cursor: pointer;
+  transition: all 0.12s;
 }
-.cat-card.bump {
-  animation: sevBump 0.6s ease, sevFlash 0.8s ease-out;
+.chart-btn:hover { background: var(--bg-elevated); color: var(--text); }
+.chart-btn.active { background: var(--accent); color: #0a0f1a; font-weight: 600; }
+.chart-msd { position: relative; }
+.chart-msd .msd-panel {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0; z-index: 99999;
+  min-width: 140px; width: max-content; max-width: 260px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  max-height: 260px; overflow: hidden;
 }
-.cat-color-0 .cat-count { color: #4DD0C4; }
-.cat-color-0:hover { background: rgba(77,208,196,0.1); border-color: #4DD0C4; }
-.cat-color-1 .cat-count { color: #42a5f5; }
-.cat-color-1:hover { background: rgba(66,165,245,0.1); border-color: #42a5f5; }
-.cat-color-2 .cat-count { color: #ab47bc; }
-.cat-color-2:hover { background: rgba(171,71,188,0.1); border-color: #ab47bc; }
-.cat-color-3 .cat-count { color: #ffa726; }
-.cat-color-3:hover { background: rgba(255,167,38,0.1); border-color: #ffa726; }
-.cat-color-4 .cat-count { color: #ff7043; }
-.cat-color-4:hover { background: rgba(255,112,67,0.1); border-color: #ff7043; }
-.cat-color-5 .cat-count { color: #66bb6a; }
-.cat-color-5:hover { background: rgba(102,187,106,0.1); border-color: #66bb6a; }
-
-@media (max-width: 640px) {
-  .cat-cards { gap: 6px; flex-wrap: wrap; }
-  .cat-card { flex: 1 1 80px; min-width: 0; }
-  .cat-card .cat-count { font-size: 22px; }
+.chart-msd.open .msd-panel { display: flex; flex-direction: column; }
+.chart-msd .msd-search { padding: 6px 8px 4px; border-bottom: 1px solid var(--border); }
+.chart-msd .msd-search input { width: 100%; padding: 4px 8px; border-radius: 3px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 11px; font-family: var(--font-body); outline: none; }
+.chart-msd .msd-search input:focus { border-color: var(--accent); }
+.chart-msd .msd-options { flex: 1; overflow-y: auto; overflow-x: hidden; max-height: 180px; }
+.chart-msd .msd-option { display: flex; align-items: center; gap: 6px; padding: 3px 10px; cursor: pointer; font-size: 10px; font-family: var(--font-mono); color: var(--text-secondary); transition: background 0.08s; border-left: 2px solid transparent; }
+.chart-msd .msd-option:hover { background: var(--bg-elevated); border-left-color: var(--accent); }
+.chart-msd .msd-option:has(input:checked) { background: var(--accent-dim); border-left-color: var(--accent); color: var(--text); }
+.chart-msd .msd-option input { accent-color: var(--accent); flex-shrink: 0; margin: 0; width: 11px; height: 11px; }
+.chart-msd .msd-option span { white-space: nowrap; }
+.chart-msd .msd-clear { display: block; width: 100%; padding: 5px 8px; border: none; border-top: 1px solid var(--border); background: transparent; color: var(--text-muted); font-family: var(--font-mono); font-size: 9px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; transition: all 0.12s; }
+.chart-msd .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
+.chart-msd .msd-trigger { display: flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 3px; border: 1px solid var(--border); background: var(--bg); color: var(--text-muted); font-size: 10px; font-family: var(--font-mono); cursor: pointer; transition: border-color 0.15s; white-space: nowrap; }
+.chart-msd .msd-trigger:hover { border-color: var(--accent); }
+.chart-msd .msd-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-msd .msd-arrow { font-size: 8px; color: var(--text-muted); transition: transform 0.2s; }
+.chart-msd.open .msd-arrow { transform: rotate(180deg); }
+.chart-body {
+  padding: 14px;
+  position: relative;
+  height: 280px;
 }
 
 .side-panel {
@@ -292,14 +314,38 @@ body::before {
 }
 .live-item.new {
   animation: slideInMini 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-             highlightFadeMini 5s ease-out forwards;
+             highlightFadeMiniCritical 5s ease-out forwards;
+}
+.live-item.new.sev-error {
+  animation: slideInMini 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+             highlightFadeMiniError 5s ease-out forwards;
+}
+.live-item.new.sev-warning {
+  animation: slideInMini 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+             highlightFadeMiniWarning 5s ease-out forwards;
+}
+.live-item.new.sev-info {
+  animation: slideInMini 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+             highlightFadeMiniInfo 5s ease-out forwards;
 }
 @keyframes slideInMini {
   0% { opacity: 0; transform: translateY(-12px) scale(0.97); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes highlightFadeMini {
-  0% { background-color: rgba(77, 208, 196, 0.12); }
+@keyframes highlightFadeMiniCritical {
+  0% { background-color: rgba(255,90,90,0.15); }
+  100% { background-color: transparent; }
+}
+@keyframes highlightFadeMiniError {
+  0% { background-color: rgba(255,159,67,0.15); }
+  100% { background-color: transparent; }
+}
+@keyframes highlightFadeMiniWarning {
+  0% { background-color: rgba(255,209,102,0.15); }
+  100% { background-color: transparent; }
+}
+@keyframes highlightFadeMiniInfo {
+  0% { background-color: rgba(91,155,213,0.15); }
   100% { background-color: transparent; }
 }
 .live-item:last-child { border-bottom: none; }
@@ -404,54 +450,6 @@ body::before {
 }
 .msd-sm .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
 
-#etsNodeMsd { position: relative; }
-#etsNodeMsd .msd-trigger {
-  display: flex; align-items: center; gap: 4px;
-  padding: 3px 8px; border-radius: 3px;
-  border: 1px solid var(--border); background: var(--bg);
-  color: var(--text-muted); font-size: 10px; font-family: var(--font-mono);
-  cursor: pointer; transition: border-color 0.15s;
-  white-space: nowrap;
-}
-#etsNodeMsd .msd-trigger:hover { border-color: var(--accent); }
-#etsNodeMsd .msd-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#etsNodeMsd .msd-arrow { font-size: 8px; color: var(--text-muted); transition: transform 0.2s; }
-#etsNodeMsd.open .msd-arrow { transform: rotate(180deg); }
-#etsNodeMsd .msd-panel {
-  display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 99999;
-  min-width: 100%; width: max-content; max-width: 300px;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  max-height: 260px; overflow: hidden;
-}
-#etsNodeMsd.open .msd-panel { display: flex; flex-direction: column; }
-#etsNodeMsd .msd-search { padding: 6px 8px 4px; border-bottom: 1px solid var(--border); }
-#etsNodeMsd .msd-search input {
-  width: 100%; padding: 4px 8px; border-radius: 3px;
-  border: 1px solid var(--border); background: var(--bg); color: var(--text);
-  font-size: 11px; font-family: var(--font-body); outline: none;
-}
-#etsNodeMsd .msd-search input:focus { border-color: var(--accent); }
-#etsNodeMsd .msd-options { flex: 1; overflow-y: auto; overflow-x: hidden; max-height: 180px; }
-#etsNodeMsd .msd-option {
-  display: flex; align-items: center; gap: 6px; padding: 3px 10px;
-  cursor: pointer; transition: background 0.08s;
-  font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary);
-  border-left: 2px solid transparent;
-}
-#etsNodeMsd .msd-option:hover { background: var(--bg-elevated); border-left-color: var(--accent); }
-#etsNodeMsd .msd-option:has(input:checked) { background: var(--accent-dim); border-left-color: var(--accent); color: var(--text); }
-#etsNodeMsd .msd-option input { accent-color: var(--accent); flex-shrink: 0; margin: 0; width: 12px; height: 12px; }
-#etsNodeMsd .msd-option span { white-space: nowrap; }
-#etsNodeMsd .msd-clear {
-  display: block; width: 100%; padding: 6px 10px;
-  border: none; border-top: 1px solid var(--border); background: transparent;
-  color: var(--text-muted); font-family: var(--font-mono);
-  font-size: 10px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em;
-  transition: all 0.12s;
-}
-#etsNodeMsd .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
-
 .panel-header-link {
   margin-left: auto;
   font-family: var(--font-mono);
@@ -492,84 +490,6 @@ body::before {
   background: var(--bg-elevated);
   color: var(--text-muted);
   font-weight: 600;
-}
-
-/* ---------- Alerts per Day chart ---------- */
-.chart-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: visible;
-  margin-bottom: 14px;
-}
-.chart-header {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.chart-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  flex-wrap: wrap;
-}
-.chart-btn-group {
-  display: flex;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.chart-btn {
-  padding: 2px 8px;
-  border: none;
-  background: var(--bg);
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-.chart-btn:hover { background: var(--bg-elevated); color: var(--text); }
-.chart-btn.active { background: var(--accent); color: #0a0f1a; font-weight: 600; }
-.chart-msd { position: relative; }
-.chart-msd .msd-panel {
-  display: none; position: absolute; top: calc(100% + 4px); right: 0; z-index: 99999;
-  min-width: 140px; width: max-content; max-width: 260px;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  max-height: 260px; overflow: hidden;
-}
-.chart-msd.open .msd-panel { display: flex; flex-direction: column; }
-.chart-msd .msd-search { padding: 6px 8px 4px; border-bottom: 1px solid var(--border); }
-.chart-msd .msd-search input { width: 100%; padding: 4px 8px; border-radius: 3px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 11px; font-family: var(--font-body); outline: none; }
-.chart-msd .msd-search input:focus { border-color: var(--accent); }
-.chart-msd .msd-options { flex: 1; overflow-y: auto; overflow-x: hidden; max-height: 180px; }
-.chart-msd .msd-option { display: flex; align-items: center; gap: 6px; padding: 3px 10px; cursor: pointer; font-size: 10px; font-family: var(--font-mono); color: var(--text-secondary); transition: background 0.08s; border-left: 2px solid transparent; }
-.chart-msd .msd-option:hover { background: var(--bg-elevated); border-left-color: var(--accent); }
-.chart-msd .msd-option:has(input:checked) { background: var(--accent-dim); border-left-color: var(--accent); color: var(--text); }
-.chart-msd .msd-option input { accent-color: var(--accent); flex-shrink: 0; margin: 0; width: 11px; height: 11px; }
-.chart-msd .msd-option span { white-space: nowrap; }
-.chart-msd .msd-clear { display: block; width: 100%; padding: 5px 8px; border: none; border-top: 1px solid var(--border); background: transparent; color: var(--text-muted); font-family: var(--font-mono); font-size: 9px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; transition: all 0.12s; }
-.chart-msd .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
-.chart-msd .msd-trigger { display: flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 3px; border: 1px solid var(--border); background: var(--bg); color: var(--text-muted); font-size: 10px; font-family: var(--font-mono); cursor: pointer; transition: border-color 0.15s; white-space: nowrap; }
-.chart-msd .msd-trigger:hover { border-color: var(--accent); }
-.chart-msd .msd-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chart-msd .msd-arrow { font-size: 8px; color: var(--text-muted); transition: transform 0.2s; }
-.chart-msd.open .msd-arrow { transform: rotate(180deg); }
-.chart-body {
-  padding: 14px;
-  position: relative;
-  height: 280px;
 }
 
 /* ---------- ETS report cards ---------- */
@@ -728,7 +648,6 @@ body::before {
   <a href="{% url 'dashboard' %}?window=all" class="msd-option" style="display:flex;align-items:center;gap:6px;padding:5px 12px;text-decoration:none;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);border-left:2px solid transparent;transition:background 0.08s;cursor:pointer;{% if time_window == 'all' %}background:var(--accent-dim);border-left-color:var(--accent);color:var(--text);{% endif %}">All Time</a>
   <a href="{% url 'dashboard' %}?window=12h" class="msd-option" style="display:flex;align-items:center;gap:6px;padding:5px 12px;text-decoration:none;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);border-left:2px solid transparent;transition:background 0.08s;cursor:pointer;{% if time_window == '12h' %}background:var(--accent-dim);border-left-color:var(--accent);color:var(--text);{% endif %}">Last 12h</a>
   <a href="{% url 'dashboard' %}?window=24h" class="msd-option" style="display:flex;align-items:center;gap:6px;padding:5px 12px;text-decoration:none;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);border-left:2px solid transparent;transition:background 0.08s;cursor:pointer;{% if time_window == '24h' %}background:var(--accent-dim);border-left-color:var(--accent);color:var(--text);{% endif %}">Last 24h</a>
-  <a href="#" data-custom="1" class="msd-option" style="display:flex;align-items:center;gap:6px;padding:5px 12px;text-decoration:none;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);border-left:2px solid transparent;transition:background 0.08s;cursor:pointer;{% if time_window == 'custom' %}background:var(--accent-dim);border-left-color:var(--accent);color:var(--text);{% endif %}">Custom</a>
 </div>
 <div class="dashboard-layout">
   <div class="main-area">
@@ -751,15 +670,6 @@ body::before {
       </a>
     </div>
 
-    <div class="cat-cards">
-      {% for category, count in category_display %}
-      <a href="{% url 'monitor_alerts' %}?category={{ category|urlencode }}" class="cat-card cat-color-{% cycle '0' '1' '2' '3' '4' '5' %}">
-        <span class="cat-count">{{ count }}</span>
-        <span class="cat-label">{{ category }}</span>
-      </a>
-      {% endfor %}
-    </div>
-
     <!-- Alerts per Day Chart -->
     <div class="chart-card">
       <div class="chart-header">
@@ -768,7 +678,6 @@ body::before {
           <div class="chart-btn-group" id="chartGroupBy">
             <button type="button" class="chart-btn active" data-value="severity">Severity</button>
             <button type="button" class="chart-btn" data-value="event_type">Type</button>
-            <button type="button" class="chart-btn" data-value="none">Total</button>
           </div>
           <div class="chart-btn-group" id="chartDays">
             <button type="button" class="chart-btn" data-value="7">7d</button>
@@ -804,30 +713,12 @@ body::before {
     <div class="node-summary-card">
       <div class="node-summary-header">
         <span>&#9776; ETS Reports</span>
-        <span class="ns-count" id="etsBadge">{{ ets_data|length }}</span>
-        <div class="msd" id="etsNodeMsd" style="margin-left:auto;">
-          <button type="button" class="msd-trigger">
-            <span class="msd-text">All Nodes</span>
-            <span class="msd-arrow">&#9662;</span>
-          </button>
-          <div class="msd-panel">
-            <div class="msd-search"><input type="text" placeholder="Search nodes..."></div>
-            <div class="msd-options">
-              {% for n in ets_node_choices %}
-              <label class="msd-option">
-                <input type="checkbox" value="{{ n }}">
-                <span>{{ n }}</span>
-              </label>
-              {% endfor %}
-            </div>
-            <button type="button" class="msd-clear">Clear</button>
-          </div>
-        </div>
-        <button type="button" class="urgent-time-btn" id="etsToggle" style="margin-left:6px;">Issues</button>
+        <span class="ns-count" id="etsBadge">{{ ets_issue_count }}</span>
       </div>
       <div id="ets-card-grid" style="padding:10px;display:flex;flex-wrap:nowrap;gap:10px;overflow-x:auto;">
         {% for e in ets_data %}
-        <div class="ets-card {% if e.has_issue %}ets-card-issue{% endif %}" data-has-issue="{{ e.has_issue|yesno:'true,false' }}" data-node="{{ e.node_id }}" onclick="window.location.href='{% url 'alert_detail' e.id %}'">
+        {% if e.has_issue %}
+        <div class="ets-card ets-card-issue" data-has-issue="true" data-node="{{ e.node_id }}" onclick="window.location.href='{% url 'alert_detail' e.id %}'">
           <div class="ets-card-header">
             <span class="ets-card-node">{{ e.node_id }}</span>
             <span class="ets-card-time">{{ e.event_time|date:'m/d H:i' }}</span>
@@ -841,9 +732,11 @@ body::before {
             {% endfor %}
           </div>
         </div>
-        {% empty %}
-        <div class="empty-panel" style="flex:1;min-width:200px;">No ETS reports found</div>
+        {% endif %}
         {% endfor %}
+        {% if not ets_has_issues %}
+        <div class="empty-panel" style="flex:1;min-width:200px;">No ETS Reports with Issues</div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -855,7 +748,7 @@ body::before {
       </div>
       <div class="panel-body live-feed-body" id="critical-feed">
         {% for a in critical_alerts %}
-        <a href="{% url 'alert_detail' a.id %}" class="live-item" data-id="{{ a.id }}" data-ingested-at="{{ a.ingested_at|date:'c' }}" data-severity="{{ a.severity }}" data-node="{{ a.node_id }}" data-event-type="{{ a.event_type }}" data-source="{{ a.source }}">
+        <a href="{% url 'alert_detail' a.id %}" class="live-item sev-{{ a.severity|lower }}" data-id="{{ a.id }}" data-ingested-at="{{ a.ingested_at|date:'c' }}" data-severity="{{ a.severity }}" data-node="{{ a.node_id }}" data-event-type="{{ a.event_type }}" data-source="{{ a.source }}">
           <span class="l-node">{{ a.node_id|slice:':2'|upper }}</span>
           <span class="l-sev {{ a.severity|lower }}">{{ a.severity|slice:":4" }}</span>
           <span class="l-title">{% firstof a.display_title a.event_type|event_type_label %}</span>
@@ -929,7 +822,7 @@ body::before {
 
       <div class="panel-body live-feed-body" id="live-feed">
         {% for a in mini_alerts %}
-        <a href="{% url 'alert_detail' a.id %}" class="live-item" data-id="{{ a.id }}" data-ingested-at="{{ a.ingested_at|date:'c' }}" data-severity="{{ a.severity }}" data-node="{{ a.node_id }}" data-event-type="{{ a.event_type }}" data-source="{{ a.source }}">
+        <a href="{% url 'alert_detail' a.id %}" class="live-item sev-{{ a.severity|lower }}" data-id="{{ a.id }}" data-ingested-at="{{ a.ingested_at|date:'c' }}" data-severity="{{ a.severity }}" data-node="{{ a.node_id }}" data-event-type="{{ a.event_type }}" data-source="{{ a.source }}">
           <span class="l-node">{{ a.node_id|slice:':2'|upper }}</span>
           <span class="l-sev {{ a.severity|lower }}">{{ a.severity|slice:":4" }}</span>
           <span class="l-title">{% firstof a.display_title a.event_type|event_type_label %}</span>
@@ -947,96 +840,146 @@ body::before {
 <script src="{% static 'telemetry/js/chart.umd.min.js' %}"></script>
 <script>
 (function(){
-  /* ETS node filter (same pattern as monitor_alerts) */
+  /* Alerts per Day chart */
   (function(){
-    var msd = document.getElementById('etsNodeMsd');
-    if (!msd) return;
-    var trigger = msd.querySelector('.msd-trigger');
-    var panel = msd.querySelector('.msd-panel');
-    var options = msd.querySelectorAll('.msd-option input');
-    var textEl = msd.querySelector('.msd-text');
-    var searchInput = msd.querySelector('.msd-search input');
-    var clearBtn = msd.querySelector('.msd-clear');
+    var canvas = document.getElementById('alertsChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    var chart = null;
 
-    function updateText() {
-      var checked = msd.querySelectorAll('.msd-option input:checked');
-      textEl.textContent = checked.length ? checked.length + ' selected' : 'All Nodes';
-    }
-    function applyNodeFilter() {
-      var checked = msd.querySelectorAll('.msd-option input:checked');
-      var nodes = [];
-      checked.forEach(function(cb) { nodes.push(cb.value); });
-      window._etsFilterNodes = nodes;
-      var toggleBtn = document.getElementById('etsToggle');
-      if (toggleBtn && toggleBtn._etsApply) toggleBtn._etsApply();
+    function getThemeColors() {
+      var dark = !document.documentElement.hasAttribute('data-theme') || document.documentElement.getAttribute('data-theme') !== 'light';
+      return { tick: dark ? '#78909c' : '#90a4ae', grid: dark ? 'rgba(69,90,100,0.15)' : 'rgba(0,0,0,0.06)', legend: dark ? '#b0bec5' : '#546e7a' };
     }
 
-    trigger.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var wasOpen = msd.classList.contains('open');
-      document.querySelectorAll('.msd.open').forEach(function(el) { el.classList.remove('open'); });
-      if (!wasOpen) {
-        msd.classList.add('open');
-        var rect = panel.getBoundingClientRect();
-        if (rect.right > window.innerWidth) { panel.style.left = 'auto'; panel.style.right = '0'; }
-        if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
-        setTimeout(function() { searchInput && searchInput.focus(); }, 50);
-      }
+    function buildChart(labels, datasets) {
+      var tc = getThemeColors();
+      datasets.forEach(function(ds) {
+        ds.pointRadius = 3;
+        ds.pointHoverRadius = 6;
+        ds.pointHitRadius = 4;
+        ds.pointBackgroundColor = ds.borderColor;
+        ds.pointBorderColor = ds.borderColor;
+        ds.pointHoverBorderColor = '#fff';
+        ds.pointHoverBorderWidth = 2;
+        ds.borderWidth = 2;
+      });
+      if (chart) { chart.destroy(); chart = null; }
+      chart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 300 },
+          interaction: { mode: 'index', intersect: false, axis: 'x' },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: tc.legend, font: { size: 10, family: "'JetBrains Mono', monospace" }, padding: 14, usePointStyle: true, pointStyle: 'circle', boxWidth: 8 },
+              onClick: function(e, legendItem, legend) {
+                var index = legendItem.datasetIndex;
+                var ci = legend.chart;
+                ci.setDatasetVisibility(index, !ci.isDatasetVisible(index));
+                ci.update();
+              }
+            },
+            tooltip: { mode: 'index', intersect: false, axis: 'x', backgroundColor: 'rgba(10,15,26,0.95)', titleFont: { size: 11 }, bodyFont: { size: 10 }, cornerRadius: 4, padding: 8 }
+          },
+          scales: {
+            x: { ticks: { color: tc.tick, font: { size: 9, family: "'JetBrains Mono', monospace" }, maxRotation: 45 }, grid: { color: tc.grid } },
+            y: { beginAtZero: true, ticks: { color: tc.tick, font: { size: 9, family: "'JetBrains Mono', monospace" }, precision: 0 }, grid: { color: tc.grid } }
+          }
+        }
+      });
+    }
+
+    var obs = new MutationObserver(function() {
+      if (!chart) return;
+      var c = getThemeColors();
+      chart.options.scales.x.ticks.color = c.tick;
+      chart.options.scales.x.grid.color = c.grid;
+      chart.options.scales.y.ticks.color = c.tick;
+      chart.options.scales.y.grid.color = c.grid;
+      chart.options.plugins.legend.labels.color = c.legend;
+      chart.update();
     });
-    panel.addEventListener('click', function(e) { e.stopPropagation(); });
-    document.addEventListener('click', function() { msd.classList.remove('open'); });
-    options.forEach(function(cb) { cb.addEventListener('change', function() { updateText(); applyNodeFilter(); }); });
-    if (searchInput) {
-      searchInput.addEventListener('input', function() {
-        var q = this.value.toLowerCase();
-        msd.querySelectorAll('.msd-option').forEach(function(opt) {
-          opt.style.display = opt.textContent.toLowerCase().includes(q) ? 'flex' : 'none';
-        });
-      });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    async function fetchChartData() {
+      try {
+        var params = new URLSearchParams();
+        var activeGroup = document.querySelector('#chartGroupBy .chart-btn.active');
+        params.set('group_by', activeGroup ? activeGroup.dataset.value : 'severity');
+        var activeDays = document.querySelector('#chartDays .chart-btn.active');
+        params.set('days', activeDays ? activeDays.dataset.value : '14');
+        document.querySelectorAll('#chartNodeMsd .msd-option input:checked').forEach(function(cb) { params.append('node', cb.value); });
+        var resp = await fetch('/api/alerts/per-day/?' + params.toString());
+        var data = await resp.json();
+        buildChart(data.labels, data.datasets);
+      } catch(e) { console.warn('Chart fetch failed:', e); }
     }
-    if (clearBtn) {
-      clearBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        msd.querySelectorAll('.msd-option input:checked').forEach(function(cb) { cb.checked = false; });
-        updateText();
-        applyNodeFilter();
-      });
-    }
-    updateText();
-  })();
-  /* ETS toggle: General / Issues */
-  (function(){
-    var btn = document.getElementById('etsToggle');
-    var grid = document.getElementById('ets-card-grid');
-    if (btn && grid) {
-      function applyFilter() {
-        var onlyIssues = btn.classList.contains('active');
-        var filterNodes = window._etsFilterNodes || [];
-        var visible = 0;
-        grid.querySelectorAll('.ets-card').forEach(function(el) {
-          var passesNode = filterNodes.length === 0 || filterNodes.indexOf(el.dataset.node) !== -1;
-          var passesIssue = !onlyIssues || el.dataset.hasIssue === 'true';
-          var show = passesNode && passesIssue;
-          el.style.display = show ? '' : 'none';
-          if (show) visible++;
-        });
-        var badge = document.getElementById('etsBadge');
-        if (badge) badge.textContent = visible;
-        btn.textContent = onlyIssues ? 'Issues' : 'General';
-      }
-      btn._etsApply = applyFilter;
+
+    document.querySelectorAll('#chartGroupBy .chart-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        btn.classList.toggle('active');
-        applyFilter();
+        document.querySelectorAll('#chartGroupBy .chart-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        fetchChartData();
       });
-      applyFilter();
-    }
+    });
+
+    document.querySelectorAll('#chartDays .chart-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('#chartDays .chart-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        fetchChartData();
+      });
+    });
+
+    (function(){
+      var msd = document.getElementById('chartNodeMsd');
+      if (!msd) return;
+      var trigger = msd.querySelector('.msd-trigger');
+      var panel = msd.querySelector('.msd-panel');
+      var options = msd.querySelectorAll('.msd-option input');
+      var textEl = msd.querySelector('.msd-text');
+      var searchInput = msd.querySelector('.msd-search input');
+      var clearBtn = msd.querySelector('.msd-clear');
+      function updateText() { textEl.textContent = msd.querySelectorAll('.msd-option input:checked').length + ' selected'; }
+      function onChange() { updateText(); fetchChartData(); }
+      trigger.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var wasOpen = msd.classList.contains('open');
+        document.querySelectorAll('.msd.open').forEach(function(el) { el.classList.remove('open'); });
+        if (!wasOpen) {
+          msd.classList.add('open');
+          if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
+          setTimeout(function() { searchInput && searchInput.focus(); }, 50);
+        }
+      });
+      panel.addEventListener('click', function(e) { e.stopPropagation(); });
+      document.addEventListener('click', function() { msd.classList.remove('open'); });
+      options.forEach(function(cb) { cb.addEventListener('change', onChange); });
+      if (searchInput) {
+        searchInput.addEventListener('input', function() {
+          var q = this.value.toLowerCase();
+          msd.querySelectorAll('.msd-option').forEach(function(opt) { opt.style.display = opt.textContent.toLowerCase().includes(q) ? 'flex' : 'none'; });
+        });
+      }
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          msd.querySelectorAll('.msd-option input:checked').forEach(function(cb) { cb.checked = false; });
+          onChange();
+        });
+      }
+      updateText();
+    })();
+
+    fetchChartData();
   })();
   /* window time frame dropdown toggle */
   (function(){
     var btn = document.getElementById('windowToggleBtn');
     var panel = document.getElementById('windowPanel');
-    var form = document.getElementById('windowCustomForm');
     var textEl = document.getElementById('windowToggleText');
     if (!btn || !panel) return;
     function position() {
@@ -1046,7 +989,6 @@ body::before {
     }
     function hideAll() {
       panel.style.display = 'none';
-      form.style.display = 'none';
     }
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -1062,21 +1004,6 @@ body::before {
     document.addEventListener('click', function() {
       panel.style.display = 'none';
     });
-    var customOpt = panel.querySelector('[data-custom]');
-    if (customOpt) customOpt.addEventListener('click', function(e) {
-      e.preventDefault();
-      panel.style.display = 'none';
-      form.style.display = 'flex';
-      if (textEl) textEl.textContent = 'Custom';
-      panel.querySelectorAll('.msd-option').forEach(function(opt) {
-        opt.style.background = '';
-        opt.style.borderLeftColor = 'transparent';
-        opt.style.color = '';
-      });
-      e.target.style.background = 'var(--accent-dim)';
-      e.target.style.borderLeftColor = 'var(--accent)';
-      e.target.style.color = 'var(--text)';
-    });
   })();
 
   const liveFeed = document.getElementById('live-feed');
@@ -1090,21 +1017,6 @@ body::before {
       if (ts && ts > maxIngestedAt) maxIngestedAt = ts;
     });
   })();
-
-  function getFilterParams() {
-    const params = new URLSearchParams();
-    params.set('limit', '200');
-    if (maxIngestedAt) params.set('since', maxIngestedAt);
-    const msds = document.querySelectorAll('.msd-sm');
-    msds.forEach(msd => {
-      const checked = msd.querySelectorAll('.msd-option input:checked');
-      if (checked.length > 0) {
-        const name = msd.closest('.msd-group').dataset.name;
-        checked.forEach(cb => params.append(name, cb.value));
-      }
-    });
-    return params;
-  }
 
   function matchesFilters(item) {
     var filters = {};
@@ -1200,10 +1112,12 @@ body::before {
     return parts.length >= 2 ? parts.slice(-2).join(' ') : v;
   }
 
+  function escHtml(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
+
   function createLiveItem(a, animate) {
     const el = document.createElement('a');
     el.href = '/alert/' + a.id + '/';
-    el.className = 'live-item' + (animate !== false ? ' new' : '');
+    el.className = 'live-item sev-' + a.severity.toLowerCase() + (animate !== false ? ' new' : '');
     el.dataset.id = a.id;
     el.dataset.ingestedAt = a.ingested_at || '';
     el.dataset.severity = a.severity;
@@ -1211,10 +1125,10 @@ body::before {
     el.dataset.eventType = a.event_type || '';
     el.dataset.source = a.source || '';
     var nodeAbbr = (el.dataset.node).substring(0,2).toUpperCase();
-    el.innerHTML = '<span class="l-node">' + nodeAbbr + '</span>'
-      + '<span class="l-sev ' + a.severity.toLowerCase() + '">' + a.severity.substring(0,4) + '</span>'
-      + '<span class="l-title">' + (a.display_title || eventTypeLabel(a.event_type) || '').substring(0,35) + '</span>'
-      + '<span class="l-time">' + (a.event_time ? a.event_time.substring(11,16) : '') + '</span>';
+    el.innerHTML = '<span class="l-node">' + escHtml(nodeAbbr) + '</span>'
+      + '<span class="l-sev ' + escHtml(a.severity.toLowerCase()) + '">' + escHtml(a.severity.substring(0,4)) + '</span>'
+      + '<span class="l-title">' + escHtml((a.display_title || eventTypeLabel(a.event_type) || '').substring(0,35)) + '</span>'
+      + '<span class="l-time">' + escHtml(a.event_time ? a.event_time.substring(11,16) : '') + '</span>';
     return el;
   }
 
@@ -1233,227 +1147,87 @@ body::before {
     }
   }
 
-  async function pollMini(incrementCounts) {
-    try {
-      const params = getFilterParams();
-      const resp = await fetch('/api/alerts/?' + params.toString());
-      const data = await resp.json();
+  function processAlerts(alerts, incrementCounts) {
+    const existingIds = new Set();
+    liveFeed.querySelectorAll('.live-item').forEach(row => existingIds.add(row.dataset.id));
+    const newAlerts = alerts.filter(a => !existingIds.has(a.id));
+    if (newAlerts.length === 0) return;
+    const latest = newAlerts.reduce((a, b) => a.ingested_at > b.ingested_at ? a : b);
+    if (latest.ingested_at > maxIngestedAt) maxIngestedAt = latest.ingested_at;
+    newAlerts.sort((a, b) => a.ingested_at.localeCompare(b.ingested_at));
+    newAlerts.forEach(function(a) {
+      var item = createLiveItem(a, incrementCounts);
+      insertIntoSorted(item, liveFeed);
+      item.style.display = matchesFilters(item) ? '' : 'none';
+    });
+    while (liveFeed.children.length > 40) liveFeed.removeChild(liveFeed.lastChild);
 
-      /* update live feed with new alerts only */
-      if (data.count > 0) {
-        const existingIds = new Set();
-        liveFeed.querySelectorAll('.live-item').forEach(row => existingIds.add(row.dataset.id));
-        const newAlerts = data.alerts.filter(a => !existingIds.has(a.id));
-        if (newAlerts.length === 0) return;
-        const latest = newAlerts.reduce((a, b) => a.ingested_at > b.ingested_at ? a : b);
-        if (latest.ingested_at > maxIngestedAt) maxIngestedAt = latest.ingested_at;
-        newAlerts.sort((a, b) => a.ingested_at.localeCompare(b.ingested_at));
-        newAlerts.forEach(function(a) {
+    if (incrementCounts && sevCardData) {
+      newAlerts.forEach(function(a) {
+        var sev = (a.severity || '').toLowerCase();
+        var info = sevCardData[sev];
+        if (info) {
+          info.val += 1;
+          info.el.textContent = info.val;
+          var card = info.el.closest('.sev-card');
+          card.classList.remove('bump');
+          void card.offsetWidth;
+          card.classList.add('bump');
+        }
+      });
+    }
+
+    if (criticalFeed) {
+      var critExistingIds = new Set();
+      criticalFeed.querySelectorAll('.live-item').forEach(function(row) { critExistingIds.add(row.dataset.id); });
+      var newCritical = newAlerts.filter(function(a) { return a.severity === 'CRITICAL' && !critExistingIds.has(a.id); });
+      if (newCritical.length > 0) {
+        newCritical.sort(function(a, b) { return a.ingested_at.localeCompare(b.ingested_at); });
+        newCritical.forEach(function(a) {
           var item = createLiveItem(a, incrementCounts);
-          insertIntoSorted(item, liveFeed);
-          /* apply active filters to newly inserted item */
-          item.style.display = matchesFilters(item) ? '' : 'none';
+          insertIntoSorted(item, criticalFeed);
         });
-        while (liveFeed.children.length > 40) liveFeed.removeChild(liveFeed.lastChild);
-
-        /* increment severity card counts client-side (only on poll, not filter change) */
-        if (incrementCounts && sevCardData) {
-          newAlerts.forEach(function(a) {
-            var sev = (a.severity || '').toLowerCase();
-            var info = sevCardData[sev];
-            if (info) {
-              info.val += 1;
-              info.el.textContent = info.val;
-              var card = info.el.closest('.sev-card');
-              card.classList.remove('bump');
-              void card.offsetWidth;
-              card.classList.add('bump');
-            }
-          });
-        }
-
-        /* increment category card counts client-side */
-        if (incrementCounts && catCardData) {
-          newAlerts.forEach(function(a) {
-            var cat = a.category || 'Unknown';
-            var info = catCardData[cat];
-            if (info) {
-              info.val += 1;
-              info.el.textContent = info.val;
-              var card = info.el.closest('.cat-card');
-              card.classList.remove('bump');
-              void card.offsetWidth;
-              card.classList.add('bump');
-            }
-          });
-        }
-
-        /* update critical feed with new critical alerts */
-        if (criticalFeed) {
-          var critExistingIds = new Set();
-          criticalFeed.querySelectorAll('.live-item').forEach(function(row) { critExistingIds.add(row.dataset.id); });
-          var newCritical = newAlerts.filter(function(a) { return a.severity === 'CRITICAL' && !critExistingIds.has(a.id); });
-          if (newCritical.length > 0) {
-            newCritical.sort(function(a, b) { return a.ingested_at.localeCompare(b.ingested_at); });
-            newCritical.forEach(function(a) {
-              var item = createLiveItem(a, incrementCounts);
-              insertIntoSorted(item, criticalFeed);
-            });
-            while (criticalFeed.children.length > 20) criticalFeed.removeChild(criticalFeed.lastChild);
-          }
-        }
+        while (criticalFeed.children.length > 20) criticalFeed.removeChild(criticalFeed.lastChild);
       }
-    } catch(e) { console.warn('Poll failed:', e); }
+    }
   }
 
-  setInterval(function() { pollMini(true); }, 5000);
+  (function() {
+    var wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var wsUrl = wsProtocol + '//' + window.location.host + '/ws/alerts/';
+    var reconnectDelay = 1000;
+
+    function connect() {
+      var ws = new WebSocket(wsUrl);
+      ws.onopen = function() { reconnectDelay = 1000; };
+      ws.onmessage = function(e) {
+        try {
+          var data = JSON.parse(e.data);
+          if (data.type === 'new_alerts' && data.alerts && data.alerts.length > 0) {
+            processAlerts(data.alerts, true);
+          }
+        } catch(err) { console.warn('WS error:', err); }
+      };
+      ws.onclose = function() {
+        setTimeout(function() {
+          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+          connect();
+        }, reconnectDelay);
+      };
+      ws.onerror = function() { ws.close(); };
+    }
+    connect();
+  })();
 
   /* initialise severity card data for client-side increment */
-  var sevCardData = null;
-  if ('{{ time_window }}' !== 'custom') {
-    sevCardData = {};
-    document.querySelectorAll('.sev-card').forEach(function(card) {
-      var labelEl = card.querySelector('.label');
-      if (labelEl) {
-        var sev = labelEl.textContent.toLowerCase();
-        sevCardData[sev] = { el: card.querySelector('.count'), val: parseInt(card.querySelector('.count').textContent) || 0 };
-      }
-    });
-  }
-
-  /* initialise category card data for client-side increment */
-  var catCardData = null;
-  if ('{{ time_window }}' !== 'custom') {
-    catCardData = {};
-    document.querySelectorAll('.cat-card').forEach(function(card) {
-      var labelEl = card.querySelector('.cat-label');
-      if (labelEl) {
-        var cat = labelEl.textContent;
-        catCardData[cat] = { el: card.querySelector('.cat-count'), val: parseInt(card.querySelector('.cat-count').textContent) || 0 };
-      }
-    });
-  }
-
-  /* Alerts per Day chart */
-  (function(){
-    var canvas = document.getElementById('alertsChart');
-    if (!canvas || typeof Chart === 'undefined') return;
-    var ctx = canvas.getContext('2d');
-
-    function getThemeColors() {
-      var dark = !document.documentElement.hasAttribute('data-theme') || document.documentElement.getAttribute('data-theme') !== 'light';
-      return { tick: dark ? '#78909c' : '#90a4ae', grid: dark ? 'rgba(69,90,100,0.15)' : 'rgba(0,0,0,0.06)', legend: dark ? '#b0bec5' : '#546e7a' };
+  var sevCardData = {};
+  document.querySelectorAll('.sev-card').forEach(function(card) {
+    var labelEl = card.querySelector('.label');
+    if (labelEl) {
+      var sev = labelEl.textContent.toLowerCase();
+      sevCardData[sev] = { el: card.querySelector('.count'), val: parseInt(card.querySelector('.count').textContent) || 0 };
     }
-
-    var tc = getThemeColors();
-    var chart = new Chart(ctx, {
-      type: 'line',
-      data: { labels: [], datasets: [] },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        animation: { duration: 400 },
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'bottom', labels: { color: tc.legend, font: { size: 10, family: "'JetBrains Mono', monospace" }, padding: 12, usePointStyle: true, pointStyle: 'circle' } },
-          tooltip: { backgroundColor: 'rgba(10,15,26,0.9)', titleFont: { size: 11 }, bodyFont: { size: 10 }, cornerRadius: 4, padding: 8 }
-        },
-        scales: {
-          x: { ticks: { color: tc.tick, font: { size: 9, family: "'JetBrains Mono', monospace" }, maxRotation: 45 }, grid: { color: tc.grid } },
-          y: { beginAtZero: true, ticks: { color: tc.tick, font: { size: 9, family: "'JetBrains Mono', monospace" }, precision: 0 }, grid: { color: tc.grid } }
-        }
-      }
-    });
-
-    function updateTheme() {
-      var c = getThemeColors();
-      if (chart.options) {
-        chart.options.scales.x.ticks.color = c.tick;
-        chart.options.scales.x.grid.color = c.grid;
-        chart.options.scales.y.ticks.color = c.tick;
-        chart.options.scales.y.grid.color = c.grid;
-        chart.options.plugins.legend.labels.color = c.legend;
-        chart.update();
-      }
-    }
-
-    var obs = new MutationObserver(updateTheme);
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
-    async function fetchChartData() {
-      try {
-        var params = new URLSearchParams();
-        var activeGroup = document.querySelector('#chartGroupBy .chart-btn.active');
-        params.set('group_by', activeGroup ? activeGroup.dataset.value : 'severity');
-        var activeDays = document.querySelector('#chartDays .chart-btn.active');
-        params.set('days', activeDays ? activeDays.dataset.value : '14');
-        document.querySelectorAll('#chartNodeMsd .msd-option input:checked').forEach(function(cb) { params.append('node', cb.value); });
-        var resp = await fetch('/api/alerts/per-day/?' + params.toString());
-        var data = await resp.json();
-        updateTheme();
-        chart.data.labels = data.labels;
-        chart.data.datasets = data.datasets;
-        chart.update();
-      } catch(e) { console.warn('Chart fetch failed:', e); }
-    }
-
-    document.querySelectorAll('#chartGroupBy .chart-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        document.querySelectorAll('#chartGroupBy .chart-btn').forEach(function(b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        fetchChartData();
-      });
-    });
-
-    document.querySelectorAll('#chartDays .chart-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        document.querySelectorAll('#chartDays .chart-btn').forEach(function(b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        fetchChartData();
-      });
-    });
-
-    (function(){
-      var msd = document.getElementById('chartNodeMsd');
-      if (!msd) return;
-      var trigger = msd.querySelector('.msd-trigger');
-      var panel = msd.querySelector('.msd-panel');
-      var options = msd.querySelectorAll('.msd-option input');
-      var textEl = msd.querySelector('.msd-text');
-      var searchInput = msd.querySelector('.msd-search input');
-      var clearBtn = msd.querySelector('.msd-clear');
-      function updateText() { textEl.textContent = msd.querySelectorAll('.msd-option input:checked').length + ' selected'; }
-      function onChange() { updateText(); fetchChartData(); }
-      trigger.addEventListener('click', function(e) {
-        e.stopPropagation();
-        var wasOpen = msd.classList.contains('open');
-        document.querySelectorAll('.msd.open').forEach(function(el) { el.classList.remove('open'); });
-        if (!wasOpen) {
-          msd.classList.add('open');
-          if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
-          setTimeout(function() { searchInput && searchInput.focus(); }, 50);
-        }
-      });
-      panel.addEventListener('click', function(e) { e.stopPropagation(); });
-      document.addEventListener('click', function() { msd.classList.remove('open'); });
-      options.forEach(function(cb) { cb.addEventListener('change', onChange); });
-      if (searchInput) {
-        searchInput.addEventListener('input', function() {
-          var q = this.value.toLowerCase();
-          msd.querySelectorAll('.msd-option').forEach(function(opt) { opt.style.display = opt.textContent.toLowerCase().includes(q) ? 'flex' : 'none'; });
-        });
-      }
-      if (clearBtn) {
-        clearBtn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          msd.querySelectorAll('.msd-option input:checked').forEach(function(cb) { cb.checked = false; });
-          onChange();
-        });
-      }
-      updateText();
-    })();
-
-    fetchChartData();
-  })();
+  });
 })();
 function showToast(text) {
   var old = document.getElementById('findAlertMsg');

@@ -2,8 +2,10 @@ import re
 import json
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.db.models import Q, Max, Count
-from django.db.models.functions import TruncDay, TruncHour
+from django.db.models.functions import TruncDay
+
 from django.core.paginator import Paginator
 from django.core.cache import cache
 from django.contrib.auth.decorators import login_required
@@ -13,17 +15,20 @@ from datetime import timedelta
 from .models import Alert, Node, IncidentEvent, IncidentMute
 
 
+def _is_admin(user):
+    if not hasattr(user, '_is_admin_cached'):
+        user._is_admin_cached = user.groups.filter(name='Admin').exists()
+    return user._is_admin_cached
+
+
 def get_alerts_for_user(user):
-    if user.groups.filter(name='Admin').exists():
+    if _is_admin(user):
         return Alert.objects.all()
-    if user.groups.filter(name='Agent').exists():
-        profile = getattr(user, 'profile', None)
-        if profile is None:
-            return Alert.objects.none()
+    profile = getattr(user, 'profile', None)
+    if profile is not None:
         allowed_nodes = profile.allowed_nodes.all()
-        if not allowed_nodes:
-            return Alert.objects.none()
-        return Alert.objects.filter(node__in=allowed_nodes)
+        if allowed_nodes:
+            return Alert.objects.filter(node__in=allowed_nodes)
     return Alert.objects.none()
 
 
@@ -37,7 +42,7 @@ def exclude_muted(qs, user):
 
 
 CACHE_TTL = 60
-FILTER_FIELDS = ['severity', 'node', 'type', 'alert', 'category', 'source']
+FILTER_FIELDS = ['severity', 'node', 'type', 'alert', 'source']
 
 
 def parse_filter_params(request):
@@ -46,7 +51,6 @@ def parse_filter_params(request):
     params['node'] = [s for s in request.GET.getlist('node') if s]
     params['type'] = [s for s in request.GET.getlist('type') if s]
     params['alert'] = [s for s in request.GET.getlist('alert') if s]
-    params['category'] = [s for s in request.GET.getlist('category') if s]
     params['source'] = [s for s in request.GET.getlist('source') if s]
     params['time_from'] = request.GET.get('time_from', '').strip()
     params['time_to'] = request.GET.get('time_to', '').strip()
@@ -65,8 +69,6 @@ def apply_filters(qs, params):
         qs = qs.filter(event_type__in=params['type'])
     if params.get('alert'):
         qs = qs.filter(display_title__in=params['alert'])
-    if params.get('category'):
-        qs = qs.filter(category__in=params['category'])
     if params.get('source'):
         qs = qs.filter(source__in=params['source'])
     if params.get('time_from'):
@@ -87,45 +89,54 @@ def get_cached_choices(cache_key, queryset, ttl=None):
 
 
 def get_node_choices(user):
-    if user.groups.filter(name='Admin').exists():
+    if _is_admin(user):
         return get_cached_choices(
             'dashboard_node_choices',
             Node.objects.values_list('name', flat=True).order_by('name'),
         )
+    profile = getattr(user, 'profile', None)
+    if profile is None:
+        return []
     return list(
-        user.profile.allowed_nodes.values_list('name', flat=True).order_by('name')
+        profile.allowed_nodes.values_list('name', flat=True).order_by('name')
     )
 
 
-def get_type_choices():
+def _user_queryset(user):
+    if _is_admin(user):
+        return Alert.objects.all()
+    profile = getattr(user, 'profile', None)
+    if profile is not None:
+        allowed_nodes = profile.allowed_nodes.all()
+        if allowed_nodes:
+            return Alert.objects.filter(node__in=allowed_nodes)
+    return Alert.objects.none()
+
+
+def get_type_choices(user):
+    suffix = '' if _is_admin(user) else f'_{user.id}'
     return get_cached_choices(
-        'dashboard_type_choices',
-        Alert.objects.filter(event_type__isnull=False).exclude(event_type='')
+        f'dashboard_type_choices{suffix}',
+        _user_queryset(user).filter(event_type__isnull=False).exclude(event_type='')
         .values_list('event_type', flat=True).distinct().order_by('event_type')[:500],
     )
 
 
-def get_source_choices():
+def get_source_choices(user):
+    suffix = '' if _is_admin(user) else f'_{user.id}'
     return get_cached_choices(
-        'dashboard_source_choices',
-        Alert.objects.filter(source__isnull=False).exclude(source='')
+        f'dashboard_source_choices{suffix}',
+        _user_queryset(user).filter(source__isnull=False).exclude(source='')
         .values_list('source', flat=True).distinct().order_by('source'),
     )
 
 
-def get_alert_choices():
+def get_alert_choices(user):
+    suffix = '' if _is_admin(user) else f'_{user.id}'
     return get_cached_choices(
-        'dashboard_alert_choices',
-        Alert.objects.filter(display_title__isnull=False).exclude(display_title='')
+        f'dashboard_alert_choices{suffix}',
+        _user_queryset(user).filter(display_title__isnull=False).exclude(display_title='')
         .order_by('display_title').values_list('display_title', flat=True).distinct('display_title')[:500],
-    )
-
-
-def get_category_choices():
-    return get_cached_choices(
-        'dashboard_category_choices',
-        Alert.objects.filter(category__isnull=False).exclude(category='')
-        .order_by('category').values_list('category', flat=True).distinct('category')[:500],
     )
 
 
@@ -134,11 +145,7 @@ def dashboard(request):
     qs = get_alerts_for_user(request.user)
 
     time_window = request.GET.get('window', 'all')
-    window_from = request.GET.get('window_from', '')
-    window_to = request.GET.get('window_to', '')
     now_tz = timezone.now()
-    window_from_display = window_from or ''
-    window_to_display = window_to or ''
 
     qs_cards = qs
     if time_window == '12h':
@@ -147,16 +154,6 @@ def dashboard(request):
     elif time_window == '24h':
         since = now_tz - timedelta(hours=24)
         qs_cards = qs.filter(event_time__gte=since)
-    elif time_window == 'custom' and window_from and window_to:
-        try:
-            ws = parse_datetime(window_from.replace('T', ' '))
-            we = parse_datetime(window_to.replace('T', ' '))
-            if ws and we:
-                qs_cards = qs.filter(event_time__gte=ws, event_time__lte=we)
-            else:
-                time_window = 'all'
-        except Exception:
-            time_window = 'all'
     else:
         time_window = 'all'
 
@@ -198,16 +195,10 @@ def dashboard(request):
     sev_order = ['CRITICAL', 'ERROR', 'WARNING', 'INFO']
 
     # Event Type counts (show all types, 0 if none match)
-    all_types = list(Alert.objects.values_list('event_type', flat=True).distinct().order_by('event_type'))
+    all_types = list(qs.values_list('event_type', flat=True).distinct().order_by('event_type'))
     type_counts_data = qs_cards.values('event_type').annotate(cnt=Count('id'))
     type_count_map = {t['event_type']: t['cnt'] for t in type_counts_data}
     type_display = [(t or 'Unknown', type_count_map.get(t, 0)) for t in all_types]
-
-    # Category counts (show all categories, 0 if none match)
-    all_categories = list(Alert.objects.values_list('category', flat=True).distinct('category').order_by('category'))
-    cat_counts_data = qs_cards.values('category').annotate(cnt=Count('id'))
-    cat_count_map = {c['category']: c['cnt'] for c in cat_counts_data}
-    category_display = [(c or 'Unknown', cat_count_map.get(c, 0)) for c in all_categories]
 
     # ETS Reports – latest per node ever that had an issue
     ets_rows = (
@@ -237,11 +228,10 @@ def dashboard(request):
             e['total'] = 0
             e['passed'] = 0
             e['has_issue'] = True
-    ets_node_choices = sorted(set(e['node_id'] for e in ets_data))
 
-    type_choices = get_type_choices()
+    type_choices = get_type_choices(request.user)
     node_choices = get_node_choices(request.user)
-    source_choices = get_source_choices()
+    source_choices = get_source_choices(request.user)
 
     return render(request, 'telemetry/dashboard.html', {
         'severity_counts': severity_counts,
@@ -256,12 +246,10 @@ def dashboard(request):
         'urgent_from_display': urgent_from_display,
         'urgent_to_display': urgent_to_display,
         'ets_data': ets_data,
-        'ets_node_choices': ets_node_choices,
+        'ets_issue_count': sum(1 for e in ets_data if e['has_issue']),
+        'ets_has_issues': any(e['has_issue'] for e in ets_data),
         'type_display': type_display,
-        'category_display': category_display,
         'time_window': time_window,
-        'window_from_display': window_from_display,
-        'window_to_display': window_to_display,
     })
 
 
@@ -289,11 +277,10 @@ def monitor_alerts(request):
     base_params.pop('page', None)
     base_query = base_params.urlencode()
 
-    type_choices = get_type_choices()
+    type_choices = get_type_choices(request.user)
     node_choices = get_node_choices(request.user)
-    source_choices = get_source_choices()
-    alert_choices = get_alert_choices()
-    category_choices = get_category_choices()
+    source_choices = get_source_choices(request.user)
+    alert_choices = get_alert_choices(request.user)
 
     return render(request, 'telemetry/alert_list.html', {
         'alerts': page_obj.object_list,
@@ -304,12 +291,10 @@ def monitor_alerts(request):
         'node_choices': node_choices,
         'source_choices': source_choices,
         'alert_choices': alert_choices,
-        'category_choices': category_choices,
         'current_severities': params['severity'],
         'current_nodes': params['node'],
         'current_types': params['type'],
         'current_alerts': params['alert'],
-        'current_categories': params['category'],
         'current_sources': params['source'],
         'current_time_from': params['time_from'],
         'current_time_to': params['time_to'],
@@ -320,8 +305,11 @@ def monitor_alerts(request):
 @login_required
 def api_alerts(request):
     since = request.GET.get('since')
-    offset = int(request.GET.get('offset', 0))
-    limit = int(request.GET.get('limit', 50))
+    try:
+        offset = int(request.GET.get('offset', 0))
+        limit = int(request.GET.get('limit', 50))
+    except (TypeError, ValueError):
+        offset, limit = 0, 50
     params = parse_filter_params(request)
 
     qs = get_alerts_for_user(request.user)
@@ -336,7 +324,7 @@ def api_alerts(request):
     qs = apply_filters(qs, params)
     qs = exclude_muted(qs, request.user)
 
-    qs = qs.only('id', 'event_type', 'severity', 'source', 'node_id', 'title', 'display_title', 'category', 'description', 'event_time', 'subtype', 'ingested_at').order_by(f'-{params["sort"]}')[offset:offset+limit]
+    qs = qs.only('id', 'event_type', 'severity', 'source', 'node_id', 'title', 'display_title', 'description', 'event_time', 'subtype', 'ingested_at').order_by(f'-{params["sort"]}')[offset:offset+limit]
     data = [
         {
             'id': str(a.id),
@@ -347,7 +335,6 @@ def api_alerts(request):
             'node_id': a.node_id,
             'title': a.title,
             'display_title': a.display_title,
-            'category': a.category,
             'description': a.description,
             'event_time': a.event_time.isoformat(),
             'subtype': a.subtype,
@@ -361,7 +348,7 @@ def api_alerts(request):
 @login_required
 def alert_exists(request, alert_id):
     from django.http import JsonResponse
-    exists = Alert.objects.filter(id=alert_id).exists()
+    exists = get_alerts_for_user(request.user).filter(id=alert_id).exists()
     return JsonResponse({'exists': exists})
 
 
@@ -427,6 +414,7 @@ def incident_note(request, alert_id):
 
 
 @login_required
+@require_POST
 def incident_note_remove(request, alert_id, event_id):
     from django.shortcuts import get_object_or_404
     alert = get_object_or_404(get_alerts_for_user(request.user), id=alert_id)
@@ -470,7 +458,7 @@ def incident_mute(request, alert_id):
         user=request.user,
         defaults={'muted_until': muted_until},
     )
-    if created or True:
+    if created:
         IncidentEvent.objects.create(
             incident_hash=alert.incident_hash,
             alert=alert,
@@ -520,8 +508,11 @@ def incident_activity(request, alert_id):
         incident_hash=alert.incident_hash
     ).select_related('user').order_by('-created_at')
     total = events_qs.count()
-    offset = int(request.GET.get('offset', 0))
-    limit = int(request.GET.get('limit', 10))
+    try:
+        offset = int(request.GET.get('offset', 0))
+        limit = int(request.GET.get('limit', 10))
+    except (TypeError, ValueError):
+        offset, limit = 0, 10
     events = events_qs[offset:offset+limit]
     muted_until = None
     try:
@@ -578,44 +569,52 @@ def email_responsible(request, alert_id):
     alert = get_object_or_404(get_alerts_for_user(request.user), id=alert_id)
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    rate_key = f'email_responsible:{request.user.id}'
+    rate_count = cache.get(rate_key, 0)
+    if rate_count >= 10:
+        return JsonResponse({'error': 'Rate limit: max 10 emails per minute'}, status=429)
+    cache.set(rate_key, rate_count + 1, timeout=60)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
         data = request.POST
-    responsible_id = data.get('responsible_id')
-    if not responsible_id:
-        return JsonResponse({'error': 'responsible_id is required'}, status=400)
-    try:
-        responsible = NodeResponsible.objects.get(id=responsible_id)
-    except NodeResponsible.DoesNotExist:
-        return JsonResponse({'error': 'Responsible person not found'}, status=404)
+    responsible_ids = data.get('responsible_ids') or ([data['responsible_id']] if data.get('responsible_id') else [])
+    if not responsible_ids:
+        return JsonResponse({'error': 'responsible_ids is required'}, status=400)
+    responsible_ids = responsible_ids[:10]
+    responsibles = NodeResponsible.objects.filter(id__in=responsible_ids)
+    if not responsibles.exists():
+        return JsonResponse({'error': 'Responsible person(s) not found'}, status=404)
     note = (data.get('note') or '').strip()
-    lines = []
-    lines.append(f"NODE: {alert.node_id}")
-    lines.append(f"RESPONSIBLE: {responsible.name} <{responsible.email}>")
-    lines.append(f"TITLE: {alert.title or ''}")
-    lines.append(f"TIME: {alert.event_time.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.event_time else ''}")
-    if alert.description:
-        lines.append(f"DESCRIPTION: {alert.description}")
-    if alert.errors:
-        lines.append(f"ERRORS: {json.dumps(alert.errors, indent=2)}")
-    if alert.tests:
-        lines.append(f"TESTS: {json.dumps(alert.tests, indent=2)}")
-    if alert.summary:
-        lines.append(f"SUMMARY: {json.dumps(alert.summary, indent=2)}")
-    lines.append("")
-    lines.append(f"AGENT NAME: {request.user.get_full_name() or request.user.username}")
-    lines.append(f"INGESTION TIME: {alert.ingested_at.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.ingested_at else ''}")
-    lines.append(f"AGENT NOTE: {note}")
-    send_mail(
-        subject=f"[WIS2 Alert] {alert.node_id} - {alert.title or alert.event_type}",
-        message="\n".join(lines),
-        from_email=None,
-        recipient_list=[responsible.email],
-        fail_silently=False,
-    )
+    sent_names = []
+    for responsible in responsibles:
+        lines = []
+        lines.append(f"NODE: {alert.node_id}")
+        lines.append(f"RESPONSIBLE: {responsible.name} <{responsible.email}>")
+        lines.append(f"TITLE: {alert.title or ''}")
+        lines.append(f"TIME: {alert.event_time.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.event_time else ''}")
+        if alert.description:
+            lines.append(f"DESCRIPTION: {alert.description}")
+        if alert.errors:
+            lines.append(f"ERRORS: {json.dumps(alert.errors, indent=2)}")
+        if alert.tests:
+            lines.append(f"TESTS: {json.dumps(alert.tests, indent=2)}")
+        if alert.summary:
+            lines.append(f"SUMMARY: {json.dumps(alert.summary, indent=2)}")
+        lines.append("")
+        lines.append(f"AGENT NAME: {request.user.get_full_name() or request.user.username}")
+        lines.append(f"INGESTION TIME: {alert.ingested_at.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.ingested_at else ''}")
+        lines.append(f"AGENT NOTE: {note}")
+        send_mail(
+            subject=f"[WIS2 Alert] {alert.node_id} - {alert.title or alert.event_type}",
+            message="\n".join(lines),
+            from_email=None,
+            recipient_list=[responsible.email],
+            fail_silently=False,
+        )
+        sent_names.append(f"{responsible.name} <{responsible.email}>")
     if alert.incident_hash:
-        email_text = f"Email sent to {responsible.name} <{responsible.email}>"
+        email_text = f"Email sent to {', '.join(sent_names)}"
         if note:
             email_text += f" — {note}"
         IncidentEvent.objects.create(
@@ -625,13 +624,13 @@ def email_responsible(request, alert_id):
             event_type='email_sent',
             text=email_text,
         )
-    return JsonResponse({'success': True})
+    return JsonResponse({'success': True, 'sent': len(sent_names)})
 
 
 @login_required
 def alert_detail(request, alert_id):
     from django.shortcuts import get_object_or_404
-    user_qs = get_alerts_for_user(request.user)
+    user_qs = get_alerts_for_user(request.user).select_related('node').prefetch_related('node__responsibles')
     alert = get_object_or_404(user_qs, id=alert_id)
 
     tests_list = []
@@ -647,7 +646,8 @@ def alert_detail(request, alert_id):
     history_count = 0
     if alert.node_id:
         history_qs = user_qs.filter(
-            node=alert.node_id
+            node=alert.node_id,
+            event_time__gte=timezone.now() - timedelta(days=30),
         ).exclude(id=alert.id).order_by('-event_time')
         history_paginator = Paginator(history_qs, 6)
         history_count = history_paginator.count
@@ -701,12 +701,15 @@ def _type_label(v):
 
 @login_required
 def api_alerts_per_day(request):
-    days = int(request.GET.get('days', 14))
+    try:
+        days = int(request.GET.get('days', 14))
+    except (TypeError, ValueError):
+        days = 14
     if days not in (7, 14, 30):
         days = 14
     nodes = request.GET.getlist('node')
     group_by = request.GET.get('group_by', 'severity')
-    if group_by not in ('severity', 'event_type', 'none'):
+    if group_by not in ('severity', 'event_type'):
         group_by = 'severity'
 
     qs = get_alerts_for_user(request.user)
@@ -716,36 +719,11 @@ def api_alerts_per_day(request):
     if nodes:
         qs = qs.filter(node_id__in=nodes)
 
-    # Generate all dates in the range so empty days show as 0
     today = timezone.now().date()
     start_date = today - timedelta(days=days - 1)
     all_date_keys = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days)]
 
     trunc = TruncDay('event_time')
-
-    if group_by == 'none':
-        data = (
-            qs.annotate(day=trunc)
-            .values('day')
-            .annotate(count=Count('id'))
-        )
-        count_map = {}
-        for d in data:
-            key = d['day'].strftime('%Y-%m-%d') if d['day'] else ''
-            count_map[key] = d['count']
-        counts = [count_map.get(d, 0) for d in all_date_keys]
-        return JsonResponse({
-            'labels': all_date_keys,
-            'datasets': [{
-                'label': 'Total',
-                'data': counts,
-                'borderColor': '#4DD0C4',
-                'backgroundColor': 'rgba(77,208,196,0.1)',
-                'fill': True,
-                'tension': 0.1,
-            }]
-        })
-
     group_field = 'severity' if group_by == 'severity' else 'event_type'
     data = (
         qs.annotate(day=trunc)
@@ -812,11 +790,6 @@ def filter_options_api(request):
         .values_list('source', flat=True).distinct().order_by('source')[:500]
     )
 
-    available['category'] = list(
-        qs.exclude(category__isnull=True).exclude(category='')
-        .values_list('category', flat=True).distinct('category').order_by('category')[:500]
-    )
-
     available['alert'] = list(
         qs.exclude(display_title__isnull=True).exclude(display_title='')
         .values_list('display_title', flat=True).distinct('display_title').order_by('display_title')[:500]
@@ -835,7 +808,7 @@ def account_view(request):
         'full_name': user.get_full_name() or user.username,
         'email': user.email or '—',
         'allowed_nodes': allowed_nodes,
-        'is_admin': user.groups.filter(name='Admin').exists(),
+        'is_admin': _is_admin(user),
     }
     return render(request, 'telemetry/account.html', ctx)
 
@@ -856,7 +829,8 @@ def alert_history_fragment(request, alert_id):
     history_count = 0
     if alert.node_id:
         history_qs = user_qs.filter(
-            node=alert.node_id
+            node=alert.node_id,
+            event_time__gte=timezone.now() - timedelta(days=30),
         ).exclude(id=alert.id).order_by('-event_time')
         history_paginator = Paginator(history_qs, 6)
         history_count = history_paginator.count

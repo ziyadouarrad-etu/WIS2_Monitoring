@@ -251,10 +251,13 @@ def _render_links(links):
         if title:
             meta_bits.append(escape(str(title)))
 
-        link_html = (
-            f'<a class="wnm-link-href" href="{href_esc}" target="_blank" rel="noopener" title="{href_esc}">{href_short}</a>'
-            if href else '<span class="wnm-link-href wnm-link-href-empty">no href</span>'
-        )
+        SAFE_SCHEMES = ('http://', 'https://')
+        if href and not href.lower().startswith(SAFE_SCHEMES):
+            link_html = f'<span class="wnm-link-href wnm-link-unsafe">{href_esc}</span>'
+        elif href:
+            link_html = f'<a class="wnm-link-href" href="{href_esc}" target="_blank" rel="noopener" title="{href_esc}">{href_short}</a>'
+        else:
+            link_html = '<span class="wnm-link-href wnm-link-href-empty">no href</span>'
 
         cards.append(
             '<div class="wnm-link-card">'

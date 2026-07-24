@@ -62,7 +62,8 @@ class Alert(models.Model):
         Node,
         on_delete=models.CASCADE,
         db_column='node',
-        to_field='name'
+        to_field='name',
+        db_index=True,
     )
     event_time = models.DateTimeField()
     datacontenttype = models.CharField(max_length=100)
@@ -73,7 +74,6 @@ class Alert(models.Model):
     channel = models.TextField(null=True, blank=True)
     title = models.TextField(null=True, blank=True)
     display_title = models.TextField(null=True, blank=True)
-    category = models.TextField(null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     wnm = models.JSONField(null=True, blank=True)
     errors = models.JSONField(null=True, blank=True)
@@ -81,7 +81,7 @@ class Alert(models.Model):
     summary = models.JSONField(null=True, blank=True)
     links = models.JSONField(null=True, blank=True)
     ingested_at = models.DateTimeField(auto_now_add=True)
-    incident_hash = models.TextField(null=True, blank=True)
+    incident_hash = models.TextField(null=True, blank=True, db_index=True)
 
     class Meta:
         managed = False
@@ -156,7 +156,7 @@ class IncidentEvent(models.Model):
 
 
 class IncidentMute(models.Model):
-    incident_hash = models.TextField()
+    incident_hash = models.TextField(db_index=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     muted_until = models.DateTimeField()
 

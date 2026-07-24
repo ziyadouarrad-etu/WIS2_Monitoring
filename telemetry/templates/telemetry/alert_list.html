@@ -203,17 +203,65 @@ body::before {
 }
 .alert-row.new {
   animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-             highlightFade 5s ease-out forwards;
+             highlightFadeCritical 5s ease-out forwards;
+}
+.alert-row.new.alert-error {
+  animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+             highlightFadeError 5s ease-out forwards;
+}
+.alert-row.new.alert-warning {
+  animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+             highlightFadeWarning 5s ease-out forwards;
+}
+.alert-row.new.alert-info {
+  animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+             highlightFadeInfo 5s ease-out forwards;
 }
 @keyframes slideIn {
   0% { opacity: 0; transform: translateY(-20px) scale(0.97); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes highlightFade {
+@keyframes highlightFadeCritical {
   0% {
-    background-color: rgba(77, 208, 196, 0.12);
-    border-color: rgba(77, 208, 196, 0.5);
-    box-shadow: 0 0 24px rgba(77, 208, 196, 0.08);
+    background-color: rgba(255,90,90,0.15);
+    border-color: rgba(255,90,90,0.5);
+    box-shadow: 0 0 24px rgba(255,90,90,0.08);
+  }
+  100% {
+    background-color: var(--bg-card);
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+@keyframes highlightFadeError {
+  0% {
+    background-color: rgba(255,159,67,0.15);
+    border-color: rgba(255,159,67,0.5);
+    box-shadow: 0 0 24px rgba(255,159,67,0.08);
+  }
+  100% {
+    background-color: var(--bg-card);
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+@keyframes highlightFadeWarning {
+  0% {
+    background-color: rgba(255,209,102,0.15);
+    border-color: rgba(255,209,102,0.5);
+    box-shadow: 0 0 24px rgba(255,209,102,0.08);
+  }
+  100% {
+    background-color: var(--bg-card);
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+@keyframes highlightFadeInfo {
+  0% {
+    background-color: rgba(91,155,213,0.15);
+    border-color: rgba(91,155,213,0.5);
+    box-shadow: 0 0 24px rgba(91,155,213,0.08);
   }
   100% {
     background-color: var(--bg-card);
@@ -441,7 +489,44 @@ body::before {
 }
 .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
 @media (prefers-reduced-motion: reduce) {
-  .header::after, .live-ring::before, .alert-row.new { animation: none; }
+  .header::after, .live-ring::before, .alert-row.new, #new-alerts-banner .banner-dot { animation: none; }
+}
+#new-alerts-banner {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin-bottom: 8px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-dim);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+#new-alerts-banner:hover {
+  background: var(--accent);
+  color: #06231f;
+}
+#new-alerts-banner.visible {
+  display: flex;
+}
+#new-alerts-banner .banner-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: bannerPulse 1.5s ease-in-out infinite;
+}
+#new-alerts-banner:hover .banner-dot {
+  background: #06231f;
+}
+@keyframes bannerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 {% endblock %}
 
@@ -542,27 +627,6 @@ body::before {
           </div>
         </div>
       </div>
-      <div class="filter-group msd-group" data-name="category">
-        <label>Category</label>
-        <div class="msd">
-          <button type="button" class="msd-trigger">
-            <span class="msd-text">All</span>
-            <span class="msd-arrow">&#9662;</span>
-          </button>
-          <div class="msd-panel">
-            <div class="msd-search"><input type="text" placeholder="Search categories..."></div>
-            <div class="msd-options">
-              {% for c in category_choices %}
-              <label class="msd-option">
-                <input type="checkbox" name="category" value="{{ c }}" {% if c in current_categories %}checked{% endif %}>
-                <span>{{ c }}</span>
-              </label>
-              {% endfor %}
-            </div>
-            <button type="button" class="msd-clear">Clear</button>
-          </div>
-        </div>
-      </div>
       <div class="filter-group msd-group" data-name="alert">
         <label>Alert</label>
         <div class="msd">
@@ -573,10 +637,10 @@ body::before {
           <div class="msd-panel">
             <div class="msd-search"><input type="text" placeholder="Search alerts..."></div>
             <div class="msd-options">
-              {% for t in alert_choices %}
+              {% for a in alert_choices %}
               <label class="msd-option">
-                <input type="checkbox" name="alert" value="{{ t }}" {% if t in current_alerts %}checked{% endif %}>
-                <span>{{ t }}</span>
+                <input type="checkbox" name="alert" value="{{ a }}" {% if a in current_alerts %}checked{% endif %}>
+                <span>{{ a }}</span>
               </label>
               {% endfor %}
             </div>
@@ -595,7 +659,7 @@ body::before {
     </div>
     <div class="filter-actions">
       <button type="submit" class="btn">Filter</button>
-      {% if current_severities or current_nodes or current_types or current_alerts or current_categories or current_sources or current_time_from or current_time_to %}
+      {% if current_severities or current_nodes or current_types or current_alerts or current_sources or current_time_from or current_time_to %}
         <a href="{% url 'monitor_alerts' %}" class="clear">Clear</a>
       {% endif %}
     </div>
@@ -617,6 +681,10 @@ body::before {
     <span>Alert</span>
   </div>
   {% endif %}
+  <a id="new-alerts-banner" href="?{% if base_query %}{{ base_query }}&{% endif %}page=1">
+    <span class="banner-dot"></span>
+    <span id="banner-text">New alerts available</span>
+  </a>
   <div class="alerts" id="alert-list">
     {% for a in alerts %}
     <a href="{% url 'alert_detail' a.id %}" class="alert-row alert-{{ a.severity|lower }}" data-id="{{ a.id }}" data-event-time="{{ a.event_time|date:'c' }}" data-ingested-at="{{ a.ingested_at|date:'c' }}">
@@ -809,6 +877,19 @@ document.querySelectorAll('.msd').forEach(function(msd) {
   const sortField = currentSort === 'ingested_at' ? 'ingestedAt' : 'eventTime';
   const apiSortField = currentSort === 'ingested_at' ? 'ingested_at' : 'event_time';
   let maxIngestedAt = '{{ latest_ingested_iso }}';
+  const currentPage = {{ page_obj.number }};
+  const pendingAlerts = new Set();
+  const banner = document.getElementById('new-alerts-banner');
+  const bannerText = document.getElementById('banner-text');
+
+  function updateBanner() {
+    if (pendingAlerts.size > 0) {
+      bannerText.textContent = pendingAlerts.size + ' new alert' + (pendingAlerts.size > 1 ? 's' : '') + ' \u2014 click to view';
+      banner.classList.add('visible');
+    } else {
+      banner.classList.remove('visible');
+    }
+  }
 
   document.querySelectorAll('.sort-btn').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -820,19 +901,13 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     });
   });
 
-  function getPollUrl() {
-    const params = new URLSearchParams(window.location.search);
-    params.delete('page');
-    if (maxIngestedAt) params.set('since', maxIngestedAt);
-    const qs = params.toString();
-    return '/api/alerts/' + (qs ? '?' + qs : '');
-  }
-
   function eventTypeLabel(v) {
     if (!v) return '';
     var parts = v.split('.');
     return parts.length >= 2 ? parts.slice(-2).join(' ') : v;
   }
+
+  function escHtml(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
 
   function createAlertRow(a) {
     const sev = a.severity.toLowerCase();
@@ -844,11 +919,11 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     link.dataset.ingestedAt = a.ingested_at;
     link.innerHTML = `
       <div class="alert-inner">
-        <div class="cell-time">${a.event_time.replace('T', ' ').substring(0, 19)}</div>
-        <div class="cell-sev cell-sev-${sev}">${a.severity}</div>
-        <div class="cell-type">${eventTypeLabel(a.event_type||'').substring(0,25)}</div>
-              <div class="cell-node">${(a.node||'').substring(0,25)}</div>
-        <div class="cell-title">${a.display_title || eventTypeLabel(a.event_type)}${a.subtype ? ' <small>('+a.subtype+')</small>' : ''}</div>
+        <div class="cell-time">${escHtml(a.event_time.replace('T', ' ').substring(0, 19))}</div>
+        <div class="cell-sev cell-sev-${escHtml(sev)}">${escHtml(a.severity)}</div>
+        <div class="cell-type">${escHtml(eventTypeLabel(a.event_type||'').substring(0,25))}</div>
+              <div class="cell-node">${escHtml((a.node||'').substring(0,25))}</div>
+        <div class="cell-title">${escHtml(a.display_title || eventTypeLabel(a.event_type))}${a.subtype ? ' <small>('+escHtml(a.subtype)+')</small>' : ''}</div>
       </div>
     `;
     return link;
@@ -869,27 +944,62 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     }
   }
 
-  async function poll() {
-    try {
-      const url = getPollUrl();
-      const resp = await fetch(url);
-      const data = await resp.json();
-      if (data.count > 0) {
-        const existingIds = new Set();
-        list.querySelectorAll('.alert-row').forEach(row => existingIds.add(row.dataset.id));
-        const newAlerts = data.alerts.filter(a => !existingIds.has(a.id));
-        if (newAlerts.length === 0) return;
-        const latest = newAlerts.reduce((a, b) => a.ingested_at > b.ingested_at ? a : b);
-        if (latest.ingested_at > maxIngestedAt) maxIngestedAt = latest.ingested_at;
-        newAlerts.sort((a, b) => a[apiSortField].localeCompare(b[apiSortField]));
-        newAlerts.forEach(a => insertSorted(createAlertRow(a)));
-      }
-    } catch(e) {
-      console.warn('Poll failed:', e);
-    }
+  function matchesUrlFilters(a) {
+    var params = new URLSearchParams(window.location.search);
+    var sev = params.getAll('severity');
+    var typ = params.getAll('type');
+    var nd = params.getAll('node');
+    var src = params.getAll('source');
+    var alrt = params.getAll('alert');
+    if (sev.length && !sev.includes(a.severity)) return false;
+    if (typ.length && !typ.includes(a.event_type)) return false;
+    if (nd.length && !nd.includes(a.node)) return false;
+    if (src.length && !src.includes(a.source)) return false;
+    if (alrt.length && !alrt.includes(a.display_title)) return false;
+    var tf = params.get('time_from');
+    var tt = params.get('time_to');
+    if (tf && a.event_time && a.event_time < tf) return false;
+    if (tt && a.event_time && a.event_time > tt) return false;
+    return true;
   }
 
-  setInterval(poll, 5000);
+  (function() {
+    var wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var wsUrl = wsProtocol + '//' + window.location.host + '/ws/alerts/';
+    var reconnectDelay = 1000;
+
+    function connect() {
+      var ws = new WebSocket(wsUrl);
+      ws.onopen = function() { reconnectDelay = 1000; };
+      ws.onmessage = function(e) {
+        try {
+          var data = JSON.parse(e.data);
+          if (data.type !== 'new_alerts' || !data.alerts || data.alerts.length === 0) return;
+          var existingIds = new Set();
+          list.querySelectorAll('.alert-row').forEach(row => existingIds.add(row.dataset.id));
+          var filtered = data.alerts.filter(a => !existingIds.has(a.id) && matchesUrlFilters(a));
+          if (filtered.length === 0) return;
+          var latest = filtered.reduce((a, b) => a.ingested_at > b.ingested_at ? a : b);
+          if (latest.ingested_at > maxIngestedAt) maxIngestedAt = latest.ingested_at;
+          if (currentPage > 1) {
+            filtered.forEach(a => pendingAlerts.add(a.id));
+            updateBanner();
+          } else {
+            filtered.sort((a, b) => a[apiSortField].localeCompare(b[apiSortField]));
+            filtered.forEach(a => insertSorted(createAlertRow(a)));
+          }
+        } catch(err) { console.warn('WS error:', err); }
+      };
+      ws.onclose = function() {
+        setTimeout(function() {
+          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+          connect();
+        }, reconnectDelay);
+      };
+      ws.onerror = function() { ws.close(); };
+    }
+    connect();
+  })();
 })();
 
 function showToast(text) {
