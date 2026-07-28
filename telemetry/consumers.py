@@ -39,7 +39,7 @@ class AlertConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _check_admin(self):
-        return self.user.groups.filter(name='Admin').exists()
+        return self.user.is_superuser or self.user.groups.filter(name='Admin').exists()
 
     @database_sync_to_async
     def _check_allowed_nodes(self):

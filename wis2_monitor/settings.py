@@ -89,9 +89,21 @@ CHANNEL_LAYERS = {
             'PORT': os.environ.get('DB_PORT', '5432'),
             'ATOMIC_REQUESTS': False,
             'AUTOCOMMIT': True,
-            'CONN_MAX_AGE': None,
-            'CONN_HEALTH_CHECKS': False,
-            'OPTIONS': {},
+            'CONN_MAX_AGE': 300,
+            'CONN_HEALTH_CHECKS': True,
+            'OPTIONS': {
+                'keepalives': 1,
+                'keepalives_idle': 60,
+                'keepalives_interval': 30,
+                'keepalives_count': 5,
+            },
+            'PSYCOPG_OPTIONS': {
+                'min_size': 1,
+                'max_size': 4,
+                'max_lifetime': 300,
+                'max_idle': 60,
+                'timeout': 5,
+            },
             'TIME_ZONE': None,
             'TEST': {'CHARSET': None, 'COLLATION': None, 'MIGRATE': True, 'MIRROR': None},
         },
@@ -119,6 +131,8 @@ DATABASES = {
         'PASSWORD': os.environ['DB_PASSWORD'],
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
+        'CONN_MAX_AGE': 300,
+        'CONN_HEALTH_CHECKS': True,
     },
 }
 

@@ -1,7 +1,7 @@
 import re
 import json
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Q, Max, Count
 from django.db.models.functions import TruncDay
@@ -17,7 +17,7 @@ from .models import Alert, Node, IncidentEvent, IncidentMute
 
 def _is_admin(user):
     if not hasattr(user, '_is_admin_cached'):
-        user._is_admin_cached = user.groups.filter(name='Admin').exists()
+        user._is_admin_cached = user.is_superuser or user.groups.filter(name='Admin').exists()
     return user._is_admin_cached
 
 
@@ -761,41 +761,13 @@ def api_alerts_per_day(request):
     return JsonResponse({'labels': labels, 'datasets': datasets})
 
 
-@login_required
-def filter_options_api(request):
-    params = parse_filter_params(request)
+import os
+from django.conf import settings
 
-    qs = get_alerts_for_user(request.user)
-    qs = apply_filters(qs, params)
 
-    available = {}
-
-    available['severity'] = list(
-        qs.exclude(severity__isnull=True).exclude(severity='')
-        .values_list('severity', flat=True).distinct().order_by('severity')[:10]
-    )
-
-    available['type'] = list(
-        qs.exclude(event_type__isnull=True).exclude(event_type='')
-        .values_list('event_type', flat=True).distinct().order_by('event_type')[:500]
-    )
-
-    available['node'] = list(
-        qs.exclude(node_id__isnull=True).exclude(node_id='')
-        .values_list('node_id', flat=True).distinct().order_by('node_id')[:500]
-    )
-
-    available['source'] = list(
-        qs.exclude(source__isnull=True).exclude(source='')
-        .values_list('source', flat=True).distinct().order_by('source')[:500]
-    )
-
-    available['alert'] = list(
-        qs.exclude(display_title__isnull=True).exclude(display_title='')
-        .values_list('display_title', flat=True).distinct('display_title').order_by('display_title')[:500]
-    )
-
-    return JsonResponse(available)
+def logo_image(request):
+    path = os.path.join(settings.BASE_DIR, 'telemetry', 'static', 'telemetry', 'img.png')
+    return FileResponse(open(path, 'rb'), content_type='image/png')
 
 
 @login_required

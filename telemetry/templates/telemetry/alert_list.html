@@ -777,10 +777,6 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     searchInput.addEventListener('input', function() {
       const q = this.value.toLowerCase();
       msd.querySelectorAll('.msd-option').forEach(function(opt) {
-        if (opt.dataset.filterValid === 'false') {
-          opt.style.display = 'none';
-          return;
-        }
         opt.style.display = opt.textContent.toLowerCase().includes(q) ? 'flex' : 'none';
       });
     });
@@ -797,79 +793,6 @@ document.querySelectorAll('.msd').forEach(function(msd) {
   updateText();
 });
 
-(function() {
-  var debounceTimer;
-  var fetching = false;
-  var lastChangedGroup = null;
-  function applyFilterOptions(data) {
-    Object.keys(data).forEach(function(key) {
-      var group = document.querySelector('.msd-group[data-name="' + key + '"]');
-      if (!group) return;
-      if (lastChangedGroup && key === lastChangedGroup) return;
-      var valid = data[key] || [];
-      var searchInput = group.querySelector('.msd-search input');
-      var searchQ = searchInput ? searchInput.value.toLowerCase() : '';
-      group.querySelectorAll('.msd-option').forEach(function(opt) {
-        var cb = opt.querySelector('input');
-        if (!cb) return;
-        var isChecked = cb.checked;
-        var isValid = isChecked || valid.indexOf(cb.value) !== -1;
-        opt.dataset.filterValid = isValid ? 'true' : 'false';
-        if (!isValid) {
-          opt.style.display = 'none';
-        } else if (searchQ && !opt.textContent.toLowerCase().includes(searchQ)) {
-          opt.style.display = 'none';
-        } else {
-          opt.style.display = 'flex';
-        }
-      });
-    });
-    lastChangedGroup = null;
-  }
-  function updateFilterOptions() {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(function() {
-      if (fetching) return;
-      var params = new URLSearchParams();
-      params.set('_', Date.now());
-      document.querySelectorAll('.msd-group').forEach(function(group) {
-        var name = group.dataset.name;
-        if (!name) return;
-        group.querySelectorAll('.msd-option input:checked').forEach(function(cb) {
-          params.append(name, cb.value);
-        });
-      });
-      document.querySelectorAll('.filter-group input[type="datetime-local"]').forEach(function(input) {
-        if (input.value) params.set(input.name, input.value);
-      });
-      fetching = true;
-      fetch('/api/alerts/filter-options/?' + params.toString())
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          fetching = false;
-          applyFilterOptions(data);
-        })
-        .catch(function(e) {
-          fetching = false;
-          console.warn('Filter options fetch failed:', e);
-        });
-    }, 120);
-  }
-  document.querySelectorAll('.msd-option input').forEach(function(cb) {
-    cb.addEventListener('change', function() {
-      var g = cb.closest('.msd-group');
-      lastChangedGroup = g ? g.dataset.name : null;
-      updateFilterOptions();
-    });
-  });
-  document.querySelectorAll('.filter-group input[type="datetime-local"]').forEach(function(input) {
-    input.addEventListener('change', function() {
-      lastChangedGroup = null;
-      updateFilterOptions();
-    });
-  });
-  updateFilterOptions();
-})();
 
 (function() {
   const list = document.getElementById('alert-list');

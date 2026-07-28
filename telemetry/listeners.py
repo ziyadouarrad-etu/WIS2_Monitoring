@@ -2,12 +2,12 @@ import json
 import os
 import signal
 import time
+import asyncio
 import logging
 import threading
 from datetime import datetime, timezone, timedelta
 
 import psycopg2
-from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 logger = logging.getLogger("WIS2_AlertListener")
@@ -20,7 +20,7 @@ ALERT_COLUMNS = (
 )
 
 
-def _hydrate_and_broadcast(conn, uuids, channel_layer):
+def _hydrate_and_broadcast(conn, uuids, channel_layer, loop):
     """Fetch full alert rows by UUID and broadcast to WebSocket clients."""
     cur = conn.cursor()
     try:
@@ -54,14 +54,13 @@ def _hydrate_and_broadcast(conn, uuids, channel_layer):
         })
 
     if alerts:
-        async_to_sync(channel_layer.group_send)(
-            'alerts_live',
-            {'type': 'new_alerts', 'alerts': alerts},
+        loop.run_until_complete(
+            channel_layer.group_send('alerts_live', {'type': 'new_alerts', 'alerts': alerts})
         )
         logger.info(f"Broadcast {len(alerts)} alerts to WebSocket clients")
 
 
-def _catch_up_broadcast(conn, last_seen_at, channel_layer):
+def _catch_up_broadcast(conn, last_seen_at, channel_layer, loop):
     """After reconnection, broadcast any alerts inserted during the offline window."""
     if last_seen_at is None:
         return
@@ -79,7 +78,7 @@ def _catch_up_broadcast(conn, last_seen_at, channel_layer):
         return
 
     uuids = [str(row[0]) for row in rows]
-    _hydrate_and_broadcast(conn, uuids, channel_layer)
+    _hydrate_and_broadcast(conn, uuids, channel_layer, loop)
     logger.info(f"Catch-up: broadcast {len(rows)} alerts missed during disconnection")
 
 
@@ -103,11 +102,14 @@ def start_alert_listener():
         'port': os.environ.get('DB_PORT', '5432'),
     }
 
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     channel_layer = get_channel_layer()
     last_seen_at = None
 
     while _running:
         conn = None
+        consecutive_errors = 0
         try:
             logger.info("Connecting to PostgreSQL for NOTIFY listener...")
             conn = psycopg2.connect(**DB_CONFIG)
@@ -117,7 +119,7 @@ def start_alert_listener():
             cur.close()
             logger.info("Listening for wis2_alerts_updates notifications...")
 
-            _catch_up_broadcast(conn, last_seen_at, channel_layer)
+            _catch_up_broadcast(conn, last_seen_at, channel_layer, loop)
 
             while _running:
                 conn.poll()
@@ -129,10 +131,14 @@ def start_alert_listener():
                                 uuids = json.loads(notify.payload) if notify.payload else []
                             except (json.JSONDecodeError, TypeError):
                                 uuids = []
-                            _hydrate_and_broadcast(conn, uuids, channel_layer)
+                            _hydrate_and_broadcast(conn, uuids, channel_layer, loop)
+                            consecutive_errors = 0
                             last_seen_at = datetime.now(timezone.utc)
                     except Exception as e:
                         logger.error(f"Broadcast error: {e}")
+                        consecutive_errors += 1
+                        if consecutive_errors >= 3:
+                            raise
                 time.sleep(0.1)
 
             if conn:
@@ -151,7 +157,7 @@ def start_alert_listener():
                     pass
             break
         except Exception as e:
-            logger.error(f"Listener connection error: {e}. Reconnecting in 5s...")
+            logger.error(f"Listener error: {e}. Reconnecting in 5s...")
             if conn:
                 try:
                     conn.close()

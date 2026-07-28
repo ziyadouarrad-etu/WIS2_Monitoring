@@ -3,44 +3,123 @@
 {% block header %}{% endblock %}
 {% block side_menu %}{% endblock %}
 {% block extra_css %}
+html, body {
+  height: 100%;
+  margin: 0;
+}
 body {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(180deg, #030b1a 0%, #0a1f3d 25%, #0c2d51 50%, #0e3a5e 75%, #124a6e 100%);
 }
-body::before {
-  content: '';
+.cloud-layer {
   position: fixed;
   inset: 0;
-  pointer-events: none;
   z-index: 0;
-  background-image: linear-gradient(rgba(146,165,191,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(146,165,191,0.045) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 75%);
+  pointer-events: none;
+  overflow: hidden;
+}
+.cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 100px;
+}
+.cloud::before,
+.cloud::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 50%;
+}
+.cloud-1 {
+  width: 300px;
+  height: 50px;
+  top: 15%;
+  left: -300px;
+  animation: drift1 35s linear infinite;
+}
+.cloud-1::before {
+  width: 100px;
+  height: 100px;
+  top: -60px;
+  left: 40px;
+}
+.cloud-1::after {
+  width: 140px;
+  height: 110px;
+  top: -70px;
+  left: 110px;
+}
+.cloud-2 {
+  width: 400px;
+  height: 60px;
+  top: 40%;
+  left: -400px;
+  animation: drift2 45s linear infinite;
+  animation-delay: -15s;
+}
+.cloud-2::before {
+  width: 140px;
+  height: 130px;
+  top: -80px;
+  left: 50px;
+}
+.cloud-2::after {
+  width: 80px;
+  height: 80px;
+  top: -40px;
+  left: 220px;
+}
+.cloud-3 {
+  width: 250px;
+  height: 40px;
+  top: 65%;
+  left: -250px;
+  animation: drift1 30s linear infinite;
+  animation-delay: -8s;
+}
+.cloud-3::before {
+  width: 90px;
+  height: 80px;
+  top: -50px;
+  left: 30px;
+}
+.cloud-3::after {
+  width: 110px;
+  height: 90px;
+  top: -55px;
+  left: 100px;
+}
+@keyframes drift1 {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(calc(100vw + 300px)); }
+}
+@keyframes drift2 {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(calc(100vw + 400px)); }
 }
 .card {
   position: relative;
   z-index: 1;
-  background: var(--bg-card);
+  background: rgba(17, 26, 43, 0.9);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 40px 36px;
   width: 100%;
-  max-width: 400px;
+  max-width: 380px;
+}
+.card .logo {
+  display: block;
+  max-width: 160px;
+  margin: 0 auto 24px;
 }
 .card h1 {
   font-family: var(--font-display);
   font-size: 20px;
   font-weight: 600;
   margin-bottom: 4px;
-}
-.card .subtitle {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 28px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 .form-group { margin-bottom: 18px; }
 .form-group label {
@@ -64,6 +143,7 @@ body::before {
   font-family: var(--font-body);
   outline: none;
   transition: border-color 0.2s;
+  box-sizing: border-box;
 }
 .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
 .btn-submit {
@@ -94,28 +174,16 @@ body::before {
 }
 .error ul { list-style: none; }
 .error li::before { content: '! '; }
-.theme-btn {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 0.15s;
-  line-height: 1;
-  position: absolute;
-  top: 14px;
-  right: 14px;
-}
-.theme-btn:hover { border-color: var(--accent); color: var(--accent); }
 {% endblock %}
 {% block content %}
+<div class="cloud-layer">
+  <div class="cloud cloud-1"></div>
+  <div class="cloud cloud-2"></div>
+  <div class="cloud cloud-3"></div>
+</div>
 <div class="card">
-  <button type="button" class="theme-btn" id="themeToggle" aria-label="Toggle theme">&#9681;</button>
-  <h1>WIS2 Telemetry</h1>
-  <div class="subtitle">Station Watch</div>
+  <img src="{% url 'logo_image' %}" alt="MarocMeteo" class="logo">
+  <h1>WIS2 Monitoring</h1>
   {% if form.errors %}
   <div class="error">
     <ul>
@@ -140,29 +208,4 @@ body::before {
     <button type="submit" class="btn-submit">Sign In</button>
   </form>
 </div>
-{% endblock %}
-{% block inline_scripts %}
-<script>
-(function(){
-  var saved = localStorage.getItem('wis2-theme');
-  if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
-  var btn = document.getElementById('themeToggle');
-  if (btn) {
-    btn.textContent = saved === 'light' ? '\u25D0' : '\u25D1';
-    btn.addEventListener('click', function(){
-      var html = document.documentElement;
-      var isLight = html.getAttribute('data-theme') === 'light';
-      if (isLight) {
-        html.removeAttribute('data-theme');
-        localStorage.setItem('wis2-theme', 'dark');
-        btn.textContent = '\u25D1';
-      } else {
-        html.setAttribute('data-theme', 'light');
-        localStorage.setItem('wis2-theme', 'light');
-        btn.textContent = '\u25D0';
-      }
-    });
-  }
-})();
-</script>
 {% endblock %}

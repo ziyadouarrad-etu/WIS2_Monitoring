@@ -115,17 +115,18 @@ def sync_staff_on_group_change(sender, instance, action, **kwargs):
     if isinstance(instance, User):
         if action in ('post_add', 'post_remove', 'post_clear'):
             is_admin = instance.groups.filter(name='Admin').exists()
-            if instance.is_staff != is_admin:
+            if instance.is_staff != is_admin or instance.is_superuser != is_admin:
                 instance.is_staff = is_admin
-                instance.save(update_fields=['is_staff'])
+                instance.is_superuser = is_admin
+                instance.save(update_fields=['is_staff', 'is_superuser'])
 
     elif isinstance(instance, Group) and instance.name == 'Admin':
         if action == 'post_add' and pk_set:
-            User.objects.filter(pk__in=pk_set, is_staff=False).update(is_staff=True)
+            User.objects.filter(pk__in=pk_set).update(is_staff=True, is_superuser=True)
         elif action == 'post_remove' and pk_set:
             still_admin = set(instance.user_set.values_list('pk', flat=True))
             removed = pk_set - still_admin
-            User.objects.filter(pk__in=removed, is_staff=True).update(is_staff=False)
+            User.objects.filter(pk__in=removed).update(is_staff=False, is_superuser=False)
 
 
 class IncidentEvent(models.Model):
