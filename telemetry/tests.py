@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from telemetry.views import _is_admin, get_alerts_for_user, apply_window, get_type_choices, expand_type_labels, apply_filters, apply_keyword_filter
 from telemetry.purge_scheduler import next_purge_target, sleep_until, run_purge
+from telemetry.context_processors import admin_panel
 from wis2_ingestion import _compute_display_title, parse_wmem_record
 
 
@@ -72,37 +73,116 @@ class IntParamHandlingTest(SimpleTestCase):
         self.user.id = 1
         self.user.groups.filter.return_value.exists.return_value = True
 
-    @patch('telemetry.views.exclude_muted')
     @patch('telemetry.views.get_alerts_for_user')
-    def test_api_alerts_per_day_bad_days(self, mock_get_alerts, mock_exclude):
+    def test_api_alerts_per_day_bad_days(self, mock_get_alerts):
         mock_qs = MagicMock()
         mock_qs.filter.return_value = mock_qs
         mock_qs.annotate.return_value = mock_qs
         mock_qs.values.return_value = mock_qs
         mock_qs.__iter__ = lambda s: iter([])
-        mock_exclude.return_value = mock_qs
         mock_get_alerts.return_value = mock_qs
         from telemetry.views import api_alerts_per_day
         request = self.factory.get('/api/alerts/per-day/', {'days': 'abc'})
         request.user = self.user
         response = api_alerts_per_day(request)
         self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['granularity'], 'day')
 
-    @patch('telemetry.views.exclude_muted')
     @patch('telemetry.views.get_alerts_for_user')
-    def test_api_alerts_per_day_valid_params(self, mock_get_alerts, mock_exclude):
+    def test_api_alerts_per_day_valid_params(self, mock_get_alerts):
         mock_qs = MagicMock()
         mock_qs.filter.return_value = mock_qs
         mock_qs.annotate.return_value = mock_qs
         mock_qs.values.return_value = mock_qs
         mock_qs.__iter__ = lambda s: iter([])
-        mock_exclude.return_value = mock_qs
         mock_get_alerts.return_value = mock_qs
         from telemetry.views import api_alerts_per_day
         request = self.factory.get('/api/alerts/per-day/', {'days': '7'})
         request.user = self.user
         response = api_alerts_per_day(request)
         self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(len(data['labels']), 7)
+        self.assertEqual(data['granularity'], 'day')
+
+    @patch('telemetry.views.get_alerts_for_user')
+    def test_api_alerts_per_day_12h_is_hourly(self, mock_get_alerts):
+        mock_qs = MagicMock()
+        mock_qs.filter.return_value = mock_qs
+        mock_qs.annotate.return_value = mock_qs
+        mock_qs.values.return_value = mock_qs
+        mock_qs.__iter__ = lambda s: iter([])
+        mock_get_alerts.return_value = mock_qs
+        from telemetry.views import api_alerts_per_day
+        request = self.factory.get('/api/alerts/per-day/', {'window': '12h', 'days': '30'})
+        request.user = self.user
+        response = api_alerts_per_day(request)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['granularity'], 'hour')
+        mock_qs.filter.assert_called()
+
+    @patch('telemetry.views.get_alerts_for_user')
+    def test_api_alerts_per_day_custom_invalid_falls_back_to_all(self, mock_get_alerts):
+        mock_qs = MagicMock()
+        mock_qs.filter.return_value = mock_qs
+        mock_qs.annotate.return_value = mock_qs
+        mock_qs.values.return_value = mock_qs
+        mock_qs.__iter__ = lambda s: iter([])
+        mock_get_alerts.return_value = mock_qs
+        from telemetry.views import api_alerts_per_day
+        request = self.factory.get('/api/alerts/per-day/', {'window': 'custom', 'from': 'garbage', 'to': '2026-08-03T00:00'})
+        request.user = self.user
+        response = api_alerts_per_day(request)
+        data = json.loads(response.content)
+        self.assertEqual(data['granularity'], 'day')
+
+    @patch('telemetry.views.get_alerts_for_user')
+    def test_api_alerts_per_day_custom_inverted_falls_back_to_all(self, mock_get_alerts):
+        mock_qs = MagicMock()
+        mock_qs.filter.return_value = mock_qs
+        mock_qs.annotate.return_value = mock_qs
+        mock_qs.values.return_value = mock_qs
+        mock_qs.__iter__ = lambda s: iter([])
+        mock_get_alerts.return_value = mock_qs
+        from telemetry.views import api_alerts_per_day
+        request = self.factory.get('/api/alerts/per-day/', {'window': 'custom', 'from': '2026-08-05T00:00', 'to': '2026-08-03T00:00'})
+        request.user = self.user
+        response = api_alerts_per_day(request)
+        data = json.loads(response.content)
+        self.assertEqual(data['granularity'], 'day')
+
+    @patch('telemetry.views.get_alerts_for_user')
+    def test_api_alerts_per_day_custom_24h_is_hourly(self, mock_get_alerts):
+        mock_qs = MagicMock()
+        mock_qs.filter.return_value = mock_qs
+        mock_qs.annotate.return_value = mock_qs
+        mock_qs.values.return_value = mock_qs
+        mock_qs.__iter__ = lambda s: iter([])
+        mock_get_alerts.return_value = mock_qs
+        from telemetry.views import api_alerts_per_day
+        request = self.factory.get('/api/alerts/per-day/', {'window': 'custom', 'from': '2026-08-01T00:00', 'to': '2026-08-02T00:00'})
+        request.user = self.user
+        response = api_alerts_per_day(request)
+        data = json.loads(response.content)
+        self.assertEqual(data['granularity'], 'hour')
+
+    @patch('telemetry.views.get_alerts_for_user')
+    def test_api_alerts_per_day_custom_long_is_daily(self, mock_get_alerts):
+        mock_qs = MagicMock()
+        mock_qs.filter.return_value = mock_qs
+        mock_qs.annotate.return_value = mock_qs
+        mock_qs.values.return_value = mock_qs
+        mock_qs.__iter__ = lambda s: iter([])
+        mock_get_alerts.return_value = mock_qs
+        from telemetry.views import api_alerts_per_day
+        request = self.factory.get('/api/alerts/per-day/', {'window': 'custom', 'from': '2026-08-01T00:00', 'to': '2026-08-03T00:00'})
+        request.user = self.user
+        response = api_alerts_per_day(request)
+        data = json.loads(response.content)
+        self.assertEqual(data['granularity'], 'day')
+        self.assertEqual(len(data['labels']), 3)
 
 
 class ApplyWindowTest(SimpleTestCase):
@@ -627,3 +707,20 @@ class PurgeSchedulerTest(SimpleTestCase):
         mock_call.side_effect = RuntimeError('boom')
         ok = run_purge()
         self.assertFalse(ok)
+
+
+class ContextProcessorTest(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    @patch('telemetry.context_processors._is_admin', return_value=True)
+    def test_exposes_admin_true(self, _):
+        req = self.factory.get('/')
+        req.user = object()
+        self.assertTrue(admin_panel(req)['is_admin'])
+
+    @patch('telemetry.context_processors._is_admin', return_value=False)
+    def test_exposes_admin_false(self, _):
+        req = self.factory.get('/')
+        req.user = object()
+        self.assertFalse(admin_panel(req)['is_admin'])

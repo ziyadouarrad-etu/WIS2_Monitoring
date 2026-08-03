@@ -3,7 +3,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Q, Max, Count, TextField
-from django.db.models.functions import TruncDay, Cast
+from django.db.models.functions import TruncDay, TruncHour, Cast
 
 from django.core.paginator import Paginator
 from django.core.cache import cache
@@ -730,18 +730,60 @@ def api_alerts_per_day(request):
     if group_by not in ('severity', 'event_type'):
         group_by = 'severity'
 
+    window = request.GET.get('window', 'all')
+    from_str = request.GET.get('from', '').strip()
+    to_str = request.GET.get('to', '').strip()
+
     qs = get_alerts_for_user(request.user)
-    since = timezone.now() - timedelta(days=days)
-    qs = qs.filter(event_time__gte=since)
-    qs = exclude_muted(qs, request.user)
     if nodes:
         qs = qs.filter(node_id__in=nodes)
 
-    today = timezone.now().date()
-    start_date = today - timedelta(days=days - 1)
-    all_date_keys = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days)]
+    now = timezone.now()
 
-    trunc = TruncDay('event_time')
+    if window == '12h':
+        from_dt = now - timedelta(hours=12)
+        to_dt = now
+    elif window == '24h':
+        from_dt = now - timedelta(hours=24)
+        to_dt = now
+    elif window == 'custom':
+        from_dt = parse_datetime(from_str) if from_str else None
+        to_dt = parse_datetime(to_str) if to_str else None
+        if from_dt is None or to_dt is None or from_dt > to_dt:
+            window = 'all'
+        else:
+            from_dt = timezone.make_aware(from_dt)
+            to_dt = timezone.make_aware(to_dt)
+    else:
+        window = 'all'
+
+    if window == 'all':
+        qs = qs.filter(event_time__gte=now - timedelta(days=days))
+        granularity = 'day'
+        labels = [(now.date() - timedelta(days=days - 1 - i)).strftime('%Y-%m-%d') for i in range(days)]
+        trunc = TruncDay('event_time')
+    else:
+        qs = qs.filter(event_time__gte=from_dt)
+        qs = qs.filter(event_time__lte=to_dt)
+        if (to_dt - from_dt) <= timedelta(hours=24):
+            granularity = 'hour'
+            trunc = TruncHour('event_time')
+            start = from_dt.replace(minute=0, second=0, microsecond=0)
+            end = to_dt.replace(minute=0, second=0, microsecond=0)
+            labels = []
+            k = start
+            while k <= end:
+                labels.append(k.strftime('%Y-%m-%d %H:%M'))
+                k += timedelta(hours=1)
+        else:
+            granularity = 'day'
+            trunc = TruncDay('event_time')
+            labels = []
+            d = from_dt.date()
+            while d <= to_dt.date():
+                labels.append(d.strftime('%Y-%m-%d'))
+                d += timedelta(days=1)
+
     group_field = 'severity' if group_by == 'severity' else 'event_type'
     data = (
         qs.annotate(day=trunc)
@@ -751,15 +793,15 @@ def api_alerts_per_day(request):
 
     day_map = {}
     group_set = set()
+    key_fmt = '%Y-%m-%d %H:%M' if granularity == 'hour' else '%Y-%m-%d'
     for d in data:
         g = d[group_field] or 'Unknown'
-        day_key = d['day'].strftime('%Y-%m-%d') if d['day'] else ''
+        day_key = d['day'].strftime(key_fmt) if d['day'] else ''
         group_set.add(g)
         if day_key not in day_map:
             day_map[day_key] = {}
         day_map[day_key][g] = d['count']
 
-    labels = all_date_keys
     all_groups = sorted(group_set)
 
     datasets = []
@@ -776,7 +818,7 @@ def api_alerts_per_day(request):
             'tension': 0.1,
         })
 
-    return JsonResponse({'labels': labels, 'datasets': datasets})
+    return JsonResponse({'granularity': granularity, 'labels': labels, 'datasets': datasets})
 
 
 @login_required

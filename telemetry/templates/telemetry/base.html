@@ -259,6 +259,13 @@ body {
       <span class="sm-icon">&#9679;</span>
       <span>Account</span>
     </a>
+    {% if is_admin %}
+    <div class="sm-section-label">Admin</div>
+    <a href="{% url 'admin:index' %}" class="sm-item" target="_blank" rel="noopener">
+      <span class="sm-icon">&#9881;</span>
+      <span>Admin Panel</span>
+    </a>
+    {% endif %}
     <div class="sm-section-label">Reference</div>
     <a href="{% url 'alarms_catalogue' %}" class="sm-item">
       <span class="sm-icon">&#9632;</span>
