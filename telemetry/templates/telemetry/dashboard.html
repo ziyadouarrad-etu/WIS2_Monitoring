@@ -15,7 +15,7 @@
 </button>
 <a href="{% url 'monitor_alerts' %}" class="nav-link">Monitor Alerts</a>
 <div class="find-alert" style="position:relative;">
-  <input type="text" id="findAlertInput" placeholder="Search by Alert ID" onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
+  <input type="text" id="findAlertInput" placeholder="Search alerts..." onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
   <button class="fa-btn" onclick="findAlert()">Find</button>
 </div>
 {% endblock %}
@@ -252,6 +252,10 @@ body::before {
   color: var(--success);
   text-shadow: 0 0 8px rgba(106, 232, 138, 0.55);
   animation: live-glyph-pulse 1.5s ease-in-out infinite;
+}
+.live-glyph-critical {
+  color: var(--critical);
+  text-shadow: 0 0 8px rgba(255, 90, 90, 0.55);
 }
 @keyframes live-glyph-pulse {
   0%, 100% { opacity: 1; }
@@ -794,7 +798,7 @@ body::before {
   <div class="side-panel">
     <div class="panel-card">
       <div class="panel-header">
-        <span class="live-glyph">&#9888;</span> CRITICAL <span class="live-cap">(last 20 alerts)</span>
+        <span class="live-glyph live-glyph-critical">&#9632;</span> CRITICAL <span class="live-cap">(last 20 alerts)</span>
       </div>
       <div class="panel-body live-feed-body" id="critical-feed">
         {% for a in critical_alerts %}
@@ -833,7 +837,7 @@ body::before {
               <div class="msd-search"><input type="text" placeholder="Search..."></div>
               <div class="msd-options">
                 {% for t in type_choices %}
-                <label class="msd-option"><input type="checkbox" value="{{ t }}"><span>{{ t|event_type_label }}</span></label>
+                <label class="msd-option"><input type="checkbox" value="{{ t }}"><span>{{ t }}</span></label>
                 {% endfor %}
               </div>
               <button type="button" class="msd-clear">Clear</button>
@@ -1087,7 +1091,7 @@ body::before {
       filters[name] = checked.length ? Array.from(checked).map(function(cb) { return cb.value; }) : null;
     });
     if (filters.severity && !filters.severity.includes(item.dataset.severity)) return false;
-    if (filters.type && !filters.type.includes(item.dataset.eventType)) return false;
+    if (filters.type && !filters.type.includes(eventTypeLabel(item.dataset.eventType))) return false;
     if (filters.node && !filters.node.includes(item.dataset.node)) return false;
     if (filters.source && !filters.source.includes(item.dataset.source)) return false;
     return true;
@@ -1309,13 +1313,13 @@ function showToast(text) {
 }
 function findAlert() {
   var input = document.getElementById('findAlertInput');
-  var id = input.value.trim();
-  if (!id) return;
-  fetch('/api/alert-exists/' + encodeURIComponent(id) + '/')
+  var kw = input.value.trim();
+  if (!kw) return;
+  fetch('/api/alert-search/?q=' + encodeURIComponent(kw))
     .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
     .then(function(data) {
-      if (data.exists) { window.location = '/alert/' + encodeURIComponent(id) + '/'; }
-      else { showToast('No alert found with this ID.'); }
+      if (data.found) { window.location = "{% url 'monitor_alerts' %}?q=" + encodeURIComponent(kw); }
+      else { showToast('No alerts match your search.'); }
     })
     .catch(function(){ showToast('Could not check alert. Please try again.'); });
 }

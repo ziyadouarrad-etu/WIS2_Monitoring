@@ -7,7 +7,7 @@
 
 {% block find_alert %}
 <div class="find-alert" style="position:relative;">
-  <input type="text" id="findAlertInput" placeholder="Search by Alert ID" onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
+  <input type="text" id="findAlertInput" placeholder="Search alerts..." onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
   <button class="fa-btn" onclick="findAlert()">Find</button>
 </div>
 {% endblock %}
@@ -517,7 +517,7 @@ body::before {
               {% for t in type_choices %}
               <label class="msd-option">
                 <input type="checkbox" name="type" value="{{ t }}" {% if t in current_types %}checked{% endif %}>
-                <span>{{ t|event_type_label }}</span>
+                <span>{{ t }}</span>
               </label>
               {% endfor %}
             </div>
@@ -597,9 +597,13 @@ body::before {
         <input type="datetime-local" id="time_to" name="time_to" value="{{ current_time_to }}">
       </div>
     </div>
+    <div class="filter-group">
+      <label for="q">Keyword</label>
+      <input type="text" id="q" name="q" value="{{ current_q }}" placeholder="Search alerts...">
+    </div>
     <div class="filter-actions">
       <button type="submit" class="btn">Filter</button>
-      {% if current_severities or current_nodes or current_types or current_alerts or current_sources or current_time_from or current_time_to %}
+      {% if current_severities or current_nodes or current_types or current_alerts or current_sources or current_time_from or current_time_to or current_q %}
         <a href="{% url 'monitor_alerts' %}" class="clear">Clear</a>
       {% endif %}
     </div>
@@ -770,6 +774,16 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     return parts.length >= 2 ? parts.slice(-2).join(' ') : v;
   }
 
+  function alertMatchesKeyword(a, q) {
+    q = String(q || '').toLowerCase();
+    if (!q) return true;
+    var fields = [a.id, a.event_type, a.source, a.node, a.node_id, a.title, a.display_title, a.description, a.subtype, a.channel, a.dataschema, a.incident_hash];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && String(fields[i]).toLowerCase().indexOf(q) !== -1) return true;
+    }
+    return false;
+  }
+
   function escHtml(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
 
   function createAlertRow(a) {
@@ -815,7 +829,9 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     var src = params.getAll('source');
     var alrt = params.getAll('alert');
     if (sev.length && !sev.includes(a.severity)) return false;
-    if (typ.length && !typ.includes(a.event_type)) return false;
+    if (typ.length && !typ.includes(eventTypeLabel(a.event_type))) return false;
+    var q = params.get('q');
+    if (q && !alertMatchesKeyword(a, q)) return false;
     if (nd.length && !nd.includes(a.node)) return false;
     if (src.length && !src.includes(a.source)) return false;
     if (alrt.length && !alrt.includes(a.display_title)) return false;
@@ -877,13 +893,13 @@ function showToast(text) {
 }
 function findAlert() {
   var input = document.getElementById('findAlertInput');
-  var id = input.value.trim();
-  if (!id) return;
-  fetch('/api/alert-exists/' + encodeURIComponent(id) + '/')
+  var kw = input.value.trim();
+  if (!kw) return;
+  fetch('/api/alert-search/?q=' + encodeURIComponent(kw))
     .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
     .then(function(data) {
-      if (data.exists) { window.location = '/alert/' + encodeURIComponent(id) + '/'; }
-      else { showToast('No alert found with this ID.'); }
+      if (data.found) { window.location = "{% url 'monitor_alerts' %}?q=" + encodeURIComponent(kw); }
+      else { showToast('No alerts match your search.'); }
     })
     .catch(function(){ showToast('Could not check alert. Please try again.'); });
 }

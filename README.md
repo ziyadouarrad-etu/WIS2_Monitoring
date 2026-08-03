@@ -301,7 +301,7 @@ All endpoints require authentication (`@login_required`).
 | GET | `/alert/<uuid>/` | Alert detail (tabs: Tests, Summary, WNM, Errors, Node History) |
 | GET | `/api/alerts/` | JSON alert feed (`?since=&offset=&limit=&severity=&node=&type=`) |
 | GET | `/api/alerts/per-day/` | Daily aggregated chart data (`?days=14&group_by=severity`) |
-| GET | `/api/alert-exists/<uuid>/` | Check if an alert exists for the current user |
+| GET | `/api/alert-search/` | Keyword search (`?q=`) -> JSON `{found, count}` |
 | GET | `/api/alert/<uuid>/history/` | Paginated node-history HTML fragment |
 | POST | `/alert/<uuid>/comment/` | Add incident comment |
 | POST | `/alert/<uuid>/note/` | Add timed note (`{"text": "...", "duration": 3600}`) |

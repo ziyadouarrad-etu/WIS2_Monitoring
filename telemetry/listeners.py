@@ -17,6 +17,7 @@ ALERT_COLUMNS = (
     'id', 'event_type', 'severity', 'source', 'node', 'title',
     'display_title', 'description', 'event_time',
     'subtype', 'ingested_at', 'incident_hash',
+    'channel', 'dataschema',
 )
 
 
@@ -52,6 +53,8 @@ def _hydrate_and_broadcast(conn, uuids, channel_layer, loop):
             'subtype': row[9],
             'ingested_at': ingested_at.isoformat() if ingested_at else None,
             'incident_hash': row[11],
+            'channel': row[12],
+            'dataschema': row[13],
         })
 
     if alerts:

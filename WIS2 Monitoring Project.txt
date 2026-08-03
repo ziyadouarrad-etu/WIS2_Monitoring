@@ -174,7 +174,8 @@ Zoom: 0.9 applied globally for size reduction
             history_count        Total history alerts count
             node_responsibles    People responsible for this node
 
-    alert_exists (login_required) -> JSON {exists: bool}
+    alert_search (login_required) -> JSON {found: bool, count: int}
+        Keyword search across alert text fields and JSON blob
 
     incident_comment (POST, login_required) -> JSON {id, created_at}
         Creates an IncidentEvent with event_type='comment'
@@ -223,7 +224,7 @@ Zoom: 0.9 applied globally for size reduction
     alert/<uuid:alert_id>/mute/                      -> incident_mute
     alert/<uuid:alert_id>/unmute/                    -> incident_unmute
     alert/<uuid:alert_id>/activity/                  -> incident_activity
-    api/alert-exists/<uuid:alert_id>/                -> alert_exists
+    api/alert-search/                                -> alert_search
     api/alerts/per-day/                              -> api_alerts_per_day
     api/alerts/                                      -> api_alerts
     api/alert/<uuid:alert_id>/history/               -> alert_history_fragment
@@ -551,8 +552,9 @@ Zoom: 0.9 applied globally for size reduction
                            email notifications, activity timeline, auto-logged
                            page views
 
-    Find Alert:            Global search-by-UUID in header of all pages, checks
-                           via /api/alert-exists/ then redirects
+    Find Alert:            Global keyword search in header of all pages, checks
+                           via /api/alert-search/ then redirects to the monitor
+                           alerts page with the keyword filter applied
 
     Responsive:            Grid collapses at 640px/768px/1000px/1100px breakpoints
 

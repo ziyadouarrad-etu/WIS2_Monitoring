@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 from django.test import SimpleTestCase, RequestFactory
 from django.core.management import call_command
 
-from telemetry.views import _is_admin, get_alerts_for_user, apply_window
+from telemetry.views import _is_admin, get_alerts_for_user, apply_window, get_type_choices, expand_type_labels, apply_filters, apply_keyword_filter
 from wis2_ingestion import _compute_display_title, parse_wmem_record
 
 
@@ -149,7 +149,7 @@ class ApplyWindowTest(SimpleTestCase):
         self.assertEqual(window, 'all')
 
 
-class AlertExistsTest(SimpleTestCase):
+class AlertSearchTest(SimpleTestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.user = MagicMock()
@@ -157,24 +157,107 @@ class AlertExistsTest(SimpleTestCase):
         self.user.id = 1
 
     def test_requires_login(self):
-        from telemetry.views import alert_exists
-        request = self.factory.get(f'/api/alert-exists/{uuid.uuid4()}/')
+        from telemetry.views import alert_search
+        request = self.factory.get('/api/alert-search/?q=meteo')
         request.user = MagicMock(is_authenticated=False)
-        response = alert_exists(request, alert_id=uuid.uuid4())
+        response = alert_search(request)
         self.assertEqual(response.status_code, 302)
 
+    @patch('telemetry.views.apply_keyword_filter')
     @patch('telemetry.views.get_alerts_for_user')
-    def test_nonexistent_alert_returns_false(self, mock_get_alerts):
-        mock_qs = MagicMock()
-        mock_qs.filter.return_value.exists.return_value = False
-        mock_get_alerts.return_value = mock_qs
-        from telemetry.views import alert_exists
-        request = self.factory.get(f'/api/alert-exists/{uuid.uuid4()}/')
+    def test_empty_q_returns_false(self, mock_get_alerts, mock_kw):
+        mock_get_alerts.return_value = MagicMock()
+        from telemetry.views import alert_search
+        request = self.factory.get('/api/alert-search/')
         request.user = self.user
-        response = alert_exists(request, alert_id=uuid.uuid4())
+        response = alert_search(request)
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
-        self.assertFalse(data['exists'])
+        self.assertFalse(data['found'])
+        self.assertEqual(data['count'], 0)
+        mock_kw.assert_not_called()
+
+    @patch('telemetry.views.apply_keyword_filter')
+    @patch('telemetry.views.get_alerts_for_user')
+    def test_match_returns_found_true(self, mock_get_alerts, mock_kw):
+        mock_qs = MagicMock()
+        mock_qs.count.return_value = 3
+        mock_kw.return_value = mock_qs
+        mock_get_alerts.return_value = MagicMock()
+        from telemetry.views import alert_search
+        request = self.factory.get('/api/alert-search/?q=meteo')
+        request.user = self.user
+        response = alert_search(request)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertTrue(data['found'])
+        self.assertEqual(data['count'], 3)
+
+    @patch('telemetry.views.apply_keyword_filter')
+    @patch('telemetry.views.get_alerts_for_user')
+    def test_no_match_returns_found_false(self, mock_get_alerts, mock_kw):
+        mock_qs = MagicMock()
+        mock_qs.count.return_value = 0
+        mock_kw.return_value = mock_qs
+        mock_get_alerts.return_value = MagicMock()
+        from telemetry.views import alert_search
+        request = self.factory.get('/api/alert-search/?q=nope')
+        request.user = self.user
+        response = alert_search(request)
+        data = json.loads(response.content)
+        self.assertFalse(data['found'])
+
+
+def _q_fields(qobj, acc=None):
+    if acc is None:
+        acc = []
+    for child in qobj.children:
+        if isinstance(child, tuple):
+            acc.append(child[0])
+        else:
+            _q_fields(child, acc)
+    return acc
+
+
+class KeywordFilterTest(SimpleTestCase):
+    def test_empty_q_returns_qs_unchanged(self):
+        qs = MagicMock()
+        out = apply_keyword_filter(qs, '   ')
+        self.assertIs(out, qs)
+        qs.filter.assert_not_called()
+
+    def test_non_uuid_keyword_matches_text_fields(self):
+        qs = MagicMock()
+        qs.filter.return_value = qs
+        qs.annotate.return_value = qs
+        apply_keyword_filter(qs, 'meteo')
+        fields = _q_fields(qs.filter.call_args_list[0].args[0])
+        for field in (
+            'event_type__icontains', 'source__icontains', 'node__name__icontains',
+            'title__icontains', 'display_title__icontains', 'description__icontains',
+            'subtype__icontains', 'channel__icontains', 'dataschema__icontains',
+            'incident_hash__icontains',
+        ):
+            self.assertIn(field, fields)
+        self.assertNotIn('id', fields)
+        blob_kwargs = qs.filter.call_args_list[1].kwargs
+        self.assertIn('_searchable_blob__icontains', blob_kwargs)
+
+    def test_uuid_keyword_adds_exact_id_match(self):
+        qs = MagicMock()
+        qs.filter.return_value = qs
+        qs.annotate.return_value = qs
+        apply_keyword_filter(qs, str(uuid.uuid4()))
+        fields = _q_fields(qs.filter.call_args_list[0].args[0])
+        self.assertIn('id', fields)
+
+    def test_apply_filters_applies_keyword(self):
+        qs = MagicMock()
+        qs.filter.return_value = qs
+        qs.annotate.return_value = qs
+        apply_filters(qs, {'q': 'meteo'})
+        fields = _q_fields(qs.filter.call_args_list[0].args[0])
+        self.assertIn('event_type__icontains', fields)
 
 
 class GetAlertsForUserTest(SimpleTestCase):
@@ -439,3 +522,58 @@ class PurgeAlertsCommandTest(SimpleTestCase):
         AlertRetentionPolicy(ttl_active=True, retention_days=30).clean()
         AlertRetentionPolicy(ttl_active=False, retention_days=None).clean()
         AlertRetentionPolicy(ttl_active=False, retention_days=30).clean()
+
+
+class TypeFilterGroupingTest(SimpleTestCase):
+    RAW_TYPES = [
+        'int.wmo.wis.wme.wnm.validation.metadata',
+        'int.wmo.wis.wme.event.wnm.validation.metadata',
+        'int.wmo.wis.wme.wnm.validation.schema',
+    ]
+
+    def _user(self):
+        user = MagicMock()
+        user.id = 1
+        user.groups.filter.return_value.exists.return_value = True
+        return user
+
+    @patch('telemetry.views.get_cached_choices')
+    def test_get_type_choices_groups_duplicate_labels(self, mock_choices):
+        mock_choices.return_value = list(self.RAW_TYPES)
+        self.assertEqual(
+            get_type_choices(self._user()),
+            ['validation metadata', 'validation schema'],
+        )
+
+    @patch('telemetry.views.get_cached_choices')
+    def test_expand_type_labels_returns_all_variants(self, mock_choices):
+        mock_choices.return_value = list(self.RAW_TYPES)
+        expanded = expand_type_labels(self._user(), ['validation metadata'])
+        self.assertEqual(
+            set(expanded),
+            {
+                'int.wmo.wis.wme.wnm.validation.metadata',
+                'int.wmo.wis.wme.event.wnm.validation.metadata',
+            },
+        )
+
+    @patch('telemetry.views.get_cached_choices')
+    def test_expand_type_labels_empty(self, mock_choices):
+        mock_choices.return_value = list(self.RAW_TYPES)
+        self.assertEqual(expand_type_labels(self._user(), []), [])
+
+    @patch('telemetry.views.get_cached_choices')
+    def test_expand_type_labels_unknown_label_returns_empty(self, mock_choices):
+        mock_choices.return_value = list(self.RAW_TYPES)
+        self.assertEqual(expand_type_labels(self._user(), ['nope']), [])
+
+    def test_apply_filters_uses_event_type_in(self):
+        qs = MagicMock()
+        qs.filter.return_value = qs
+        types = [
+            'int.wmo.wis.wme.wnm.validation.metadata',
+            'int.wmo.wis.wme.event.wnm.validation.metadata',
+        ]
+        out = apply_filters(qs, {'type': types})
+        qs.filter.assert_called_with(event_type__in=types)
+        self.assertIs(out, qs)

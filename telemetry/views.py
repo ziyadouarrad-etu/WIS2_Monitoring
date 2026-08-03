@@ -1,8 +1,9 @@
+import uuid
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.db.models import Q, Max, Count
-from django.db.models.functions import TruncDay
+from django.db.models import Q, Max, Count, TextField
+from django.db.models.functions import TruncDay, Cast
 
 from django.core.paginator import Paginator
 from django.core.cache import cache
@@ -52,6 +53,7 @@ def parse_filter_params(request):
     params['source'] = [s for s in request.GET.getlist('source') if s]
     params['time_from'] = request.GET.get('time_from', '').strip()
     params['time_to'] = request.GET.get('time_to', '').strip()
+    params['q'] = request.GET.get('q', '').strip()
     params['sort'] = request.GET.get('sort', 'ingested_at')
     if params['sort'] not in ('event_time', 'ingested_at'):
         params['sort'] = 'ingested_at'
@@ -73,7 +75,38 @@ def apply_filters(qs, params):
         qs = qs.filter(event_time__gte=params['time_from'])
     if params.get('time_to'):
         qs = qs.filter(event_time__lte=params['time_to'])
+    if params.get('q'):
+        qs = apply_keyword_filter(qs, params['q'])
     return qs
+
+
+def apply_keyword_filter(qs, q):
+    """Filter alerts whose text fields or full JSON blob contain the keyword."""
+    q = (q or '').strip()
+    if not q:
+        return qs
+    text_q = (
+        Q(event_type__icontains=q)
+        | Q(source__icontains=q)
+        | Q(node__name__icontains=q)
+        | Q(title__icontains=q)
+        | Q(display_title__icontains=q)
+        | Q(description__icontains=q)
+        | Q(subtype__icontains=q)
+        | Q(channel__icontains=q)
+        | Q(dataschema__icontains=q)
+        | Q(incident_hash__icontains=q)
+    )
+    try:
+        uuid.UUID(q)
+    except (ValueError, AttributeError, TypeError):
+        pass
+    else:
+        text_q |= Q(id=q)
+    qs = qs.filter(text_q)
+    return qs.annotate(
+        _searchable_blob=Cast('raw_json', output_field=TextField())
+    ).filter(_searchable_blob__icontains=q)
 
 
 def apply_window(qs, time_window, from_str='', to_str=''):
@@ -115,13 +148,24 @@ def get_node_choices(user):
     )
 
 
-def get_type_choices(user):
+def _raw_type_choices(user):
     suffix = '' if _is_admin(user) else f'_{user.id}'
     return get_cached_choices(
         f'dashboard_type_choices{suffix}',
         get_alerts_for_user(user).filter(event_type__isnull=False).exclude(event_type='')
         .values_list('event_type', flat=True).distinct().order_by('event_type')[:500],
     )
+
+
+def get_type_choices(user):
+    return sorted({event_type_label(t) for t in _raw_type_choices(user)})
+
+
+def expand_type_labels(user, labels):
+    if not labels:
+        return []
+    label_set = set(labels)
+    return [t for t in _raw_type_choices(user) if event_type_label(t) in label_set]
 
 
 def get_source_choices(user):
@@ -254,6 +298,9 @@ def monitor_alerts(request):
     params = parse_filter_params(request)
     sort = params['sort']
 
+    type_labels = params['type']
+    params['type'] = expand_type_labels(request.user, type_labels)
+
     qs = get_alerts_for_user(request.user)
     qs = apply_filters(qs, params)
     qs = exclude_muted(qs, request.user)
@@ -288,20 +335,23 @@ def monitor_alerts(request):
         'alert_choices': alert_choices,
         'current_severities': params['severity'],
         'current_nodes': params['node'],
-        'current_types': params['type'],
+        'current_types': type_labels,
         'current_alerts': params['alert'],
         'current_sources': params['source'],
         'current_time_from': params['time_from'],
         'current_time_to': params['time_to'],
+        'current_q': params['q'],
         'current_sort': sort,
     })
 
 
 @login_required
-def alert_exists(request, alert_id):
-    from django.http import JsonResponse
-    exists = get_alerts_for_user(request.user).filter(id=alert_id).exists()
-    return JsonResponse({'exists': exists})
+def alert_search(request):
+    q = request.GET.get('q', '').strip()
+    if not q:
+        return JsonResponse({'found': False, 'count': 0})
+    count = apply_keyword_filter(get_alerts_for_user(request.user), q).count()
+    return JsonResponse({'found': count > 0, 'count': count})
 
 
 @login_required
