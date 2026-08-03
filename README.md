@@ -261,34 +261,30 @@ Purging deletes alerts whose `ingested_at` is older than the cutoff (in batches 
 along with their incident history (`incident_events`). User mute preferences are kept.
 Purging only runs when **TTL active** is checked in the admin; otherwise the command is a no-op.
 
-To schedule it nightly on the server, install a systemd timer (adjust the paths to your deploy):
+### Automatic nightly run (in-app scheduler)
 
-```ini
-# /etc/systemd/system/wis2-purge.service
-[Unit]
-Description=Purge expired WIS2 alerts
-[Service]
-Type=oneshot
-WorkingDirectory=/opt/wis2_monitor
-ExecStart=/opt/wis2_monitor/.venv/bin/python manage.py purge_alerts
-```
+The purge runs automatically every night at **03:00** (server time, UTC by default),
+scheduled **inside the ingestion process** (`wis2-ingestion`). The scheduler is a
+dedicated thread in `wis2_ingestion.py` — no systemd timer or external scheduler is
+needed. On the server, `sudo systemctl restart wis2-ingestion` picks up the code; locally,
+restart the ingestion script the same way you normally would.
 
-```ini
-# /etc/systemd/system/wis2-purge.timer
-[Unit]
-Description=Run WIS2 alert purge nightly
-[Timer]
-OnCalendar=*-*-* 03:00:00
-RandomizedDelaySec=30min
-Persistent=true
-[Install]
-WantedBy=timers.target
-```
+Configuration (environment variables):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PURGE_HOUR` | `3` | Hour of day (0-23, local time) at which the purge runs. |
+| `PURGE_ON_STARTUP` | `false` | When `true`, run the purge once as soon as the ingestion starts (handy to clear an existing backlog after enabling TTL; keep `false` otherwise). |
+
+Example (`/etc/systemd/system/wis2-ingestion.service` Environment= or `.env`):
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now wis2-purge.timer
+PURGE_HOUR=3
+PURGE_ON_STARTUP=false
 ```
+
+To clear the backlog immediately without waiting for 03:00, run
+`python manage.py purge_alerts --dry-run` first, then `python manage.py purge_alerts`.
 
 ## API Endpoints
 

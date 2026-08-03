@@ -5,7 +5,34 @@ Replace the "empty days = persistence" semantics with an explicit **`ttl_active`
 - Admin sets `ttl_active` to **false** → alerts persist forever (days value ignored).
 - Admin sets `ttl_active` to **true** → `retention_days` must be set; alerts older than that are purged.
 
-The rest of the pipeline (command, scheduling, cascade) is unchanged.
+The rest of the pipeline (command, cascade) is unchanged. Scheduling moved from a
+systemd timer (never actually installed) to an in-app scheduler inside the ingestion
+process.
+
+## Scheduler (added)
+
+### `telemetry/purge_scheduler.py` (new)
+- `next_purge_target(now, hour=3)` → local-time aware datetime of the next `hour:00`
+  (today if before the hour, otherwise tomorrow).
+- `sleep_until(target, stop_fn, chunk_secs=60)` → sleep in 1-minute chunks, aborting
+  early when `stop_fn()` returns True (clean shutdown).
+- `run_purge(logger)` → runs `call_command('purge_alerts')` via `StringIO`, closes stale
+  DB connections, catches all exceptions (returns False instead of raising). Never crashes
+  the ingestion loop.
+- `purge_scheduler_worker(stop_fn, logger, hour=3, on_startup=False)` → optional startup
+  run, then loop: log next target → sleep → purge.
+
+### `wis2_ingestion.py`
+- `django.setup()` after `load_dotenv()`; import the worker.
+- `start_ingestion_node()` spawns a daemon `Purge-Scheduler` thread
+  (`hour`/`on_startup` from env `PURGE_HOUR` default 3, `PURGE_ON_STARTUP` default false).
+- Shutdown joins `db_thread(timeout=30)` then `purge_thread(timeout=5)`.
+
+### Docs (done)
+- `README.md` "Alert retention (TTL)": replaced the systemd-timer block with in-app
+  scheduler + `PURGE_HOUR`/`PURGE_ON_STARTUP` env vars.
+- `WIS2 Monitoring Project.txt` §8.5 Scheduling: in-app scheduler in `wis2-ingestion`,
+  no systemd timer required.
 
 ## Delta from the current implementation
 
@@ -56,7 +83,7 @@ Unchanged (already reads `get_retention_days()`; returns None → persistence no
 
 ## Verification
 1. `python manage.py check` (expect 5 pre-existing W042)
-2. `python manage.py test telemetry` (57 tests, 4 pre-existing errors)
+2. `python manage.py test telemetry` (68 + new `PurgeSchedulerTest` tests, 4 pre-existing errors)
 3. `python manage.py makemigrations --check --dry-run` clean
 4. Apply `migrate`, then smoke:
    - Admin change form: checkbox present; days always editable; check + empty days → inline error;
@@ -65,4 +92,8 @@ Unchanged (already reads `get_retention_days()`; returns None → persistence no
    - Reset policy to default (ttl_active=False) after smoke.
 
 ## Deploy
-`migrate` (0014) on server; existing policy row becomes inactive (persistence). Set the toggle in admin. Existing `wis2-purge.timer` keeps running nightly.
+`migrate` (0014) on server; existing policy row becomes inactive (persistence). Set the
+toggle in admin. Restart `wis2-ingestion` to start the in-app scheduler
+(`sudo systemctl restart wis2-ingestion`); no migration needed for the scheduler itself.
+Optional one-time backlog catch-up: `python manage.py purge_alerts --dry-run` then real
+run (or set `PURGE_ON_STARTUP=true` once; keep `false` normally).

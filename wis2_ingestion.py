@@ -2,9 +2,12 @@ import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 import json
 import os
+import django
 from dotenv import load_dotenv
 
 load_dotenv()
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'wis2_monitor.settings')
+django.setup()
 import ssl
 import signal
 import threading
@@ -19,6 +22,8 @@ import hashlib
 import uuid
 import re
 from pathlib import Path
+
+from telemetry.purge_scheduler import purge_scheduler_worker
 
 
 # =====================================================================
@@ -385,6 +390,23 @@ def start_ingestion_node():
     db_thread = threading.Thread(target=db_writer_worker, daemon=True)
     db_thread.start()
 
+    purge_hour = int(os.environ.get('PURGE_HOUR', '3') or '3')
+    purge_on_startup = os.environ.get('PURGE_ON_STARTUP', '').strip().lower() in ('1', 'true', 'yes', 'on')
+    purge_thread = threading.Thread(
+        target=purge_scheduler_worker,
+        kwargs={
+            'stop_fn': lambda: not SYSTEM_RUNNING,
+            'hour': purge_hour,
+            'on_startup': purge_on_startup,
+        },
+        name="Purge-Scheduler",
+        daemon=True,
+    )
+    purge_thread.start()
+    logger.info(
+        f"Nightly purge scheduler active (hour={purge_hour:02d}:00, on_startup={purge_on_startup})."
+    )
+
     # Generate a dynamic 8-character hash for the client ID
     unique_node_id = f"wis2-telemetry-node-{uuid.uuid4().hex[:8]}"
 
@@ -422,6 +444,7 @@ def start_ingestion_node():
         client.disconnect()
         logger.info("Attente que le thread DB écrive les dernières données...")
         db_thread.join(timeout=30)
+        purge_thread.join(timeout=5)
         logger.info("Arrêt complet du système.")
 
 

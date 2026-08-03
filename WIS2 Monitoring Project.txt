@@ -505,9 +505,14 @@ Zoom: 0.9 applied globally for size reduction
                            alerts first (FK db_constraint=False, so no DB
                            cascade); keeps incident_mutes (hash-keyed)
 
-    Scheduling:            systemd timer wis2-purge.timer -> wis2-purge.service
-                           (nightly 03:00, Persistent=true, 30min jitter)
-                           Templates in README "Alert retention (TTL)"
+    Scheduling:            In-app scheduler inside the ingestion process
+                           (wis2-ingestion), nightly at 03:00 server time.
+                           Runs the purge_alerts command from a dedicated
+                           "Purge-Scheduler" daemon thread (telemetry/purge_scheduler.py).
+                           No systemd timer / external scheduler required.
+                           Env vars: PURGE_HOUR (default 3), PURGE_ON_STARTUP
+                           (default false). Restart wis2-ingestion to apply.
+                           Manual run: python manage.py purge_alerts
 
 
 9. SETTINGS (wis2_monitor/settings.py)

@@ -1,20 +1,25 @@
 import hashlib
 import io
 import json
+import time as _time
 import uuid
+from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
 from django.test import SimpleTestCase, RequestFactory
 from django.core.management import call_command
+from django.utils import timezone
 
 from telemetry.views import _is_admin, get_alerts_for_user, apply_window, get_type_choices, expand_type_labels, apply_filters, apply_keyword_filter
+from telemetry.purge_scheduler import next_purge_target, sleep_until, run_purge
 from wis2_ingestion import _compute_display_title, parse_wmem_record
 
 
 class IsAdminCachingTest(SimpleTestCase):
-    def _make_user(self, is_admin=False):
-        user = MagicMock(spec=['id', 'groups'])
+    def _make_user(self, is_admin=False, is_superuser=False):
+        user = MagicMock(spec=['id', 'groups', 'is_superuser'])
         user.id = 1
+        user.is_superuser = is_superuser
         user.groups.filter.return_value.exists.return_value = is_admin
         return user
 
@@ -25,6 +30,10 @@ class IsAdminCachingTest(SimpleTestCase):
     def test_regular_returns_false(self):
         user = self._make_user(is_admin=False)
         self.assertFalse(_is_admin(user))
+
+    def test_superuser_returns_true(self):
+        user = self._make_user(is_admin=False, is_superuser=True)
+        self.assertTrue(_is_admin(user))
 
     def test_result_is_cached(self):
         user = self._make_user(is_admin=False)
@@ -577,3 +586,44 @@ class TypeFilterGroupingTest(SimpleTestCase):
         out = apply_filters(qs, {'type': types})
         qs.filter.assert_called_with(event_type__in=types)
         self.assertIs(out, qs)
+
+
+class PurgeSchedulerTest(SimpleTestCase):
+    def _now(self, y, m, d, hh, mm=0):
+        return timezone.make_aware(datetime(y, m, d, hh, mm))
+
+    def test_target_before_hour_is_today(self):
+        now = self._now(2026, 8, 3, 2, 30)
+        target = next_purge_target(now, hour=3)
+        self.assertEqual((target.hour, target.minute), (3, 0))
+        self.assertEqual(target.date(), now.date())
+
+    def test_target_after_hour_is_tomorrow(self):
+        now = self._now(2026, 8, 3, 4, 30)
+        target = next_purge_target(now, hour=3)
+        self.assertEqual((target.hour, target.minute), (3, 0))
+        self.assertEqual(target.date(), now.date() + timedelta(days=1))
+
+    def test_target_at_hour_is_tomorrow(self):
+        now = self._now(2026, 8, 3, 3, 0)
+        target = next_purge_target(now, hour=3)
+        self.assertEqual(target.date(), now.date() + timedelta(days=1))
+
+    def test_sleep_until_stops_when_stop_fn_true(self):
+        start = _time.monotonic()
+        sleep_until(timezone.now() + timedelta(days=1), stop_fn=lambda: True)
+        self.assertLess(_time.monotonic() - start, 1)
+
+    @patch('telemetry.purge_scheduler.call_command')
+    def test_run_purge_calls_command(self, mock_call):
+        ok = run_purge()
+        self.assertTrue(ok)
+        mock_call.assert_called_once()
+        self.assertEqual(mock_call.call_args[0][0], 'purge_alerts')
+        self.assertIn('stdout', mock_call.call_args[1])
+
+    @patch('telemetry.purge_scheduler.call_command')
+    def test_run_purge_survives_failure(self, mock_call):
+        mock_call.side_effect = RuntimeError('boom')
+        ok = run_purge()
+        self.assertFalse(ok)
