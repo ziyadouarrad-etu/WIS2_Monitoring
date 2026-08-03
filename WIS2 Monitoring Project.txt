@@ -1,5 +1,5 @@
-WIS2 Global Telemetry Monitor — Complete Project Documentation
-================================================================
+WIS2 Monitoring Events — Complete Project Documentation
+========================================================
 
 
 1. PROJECT OVERVIEW
@@ -48,7 +48,6 @@ Zoom: 0.9 applied globally for size reduction
     - channel:           TextField, nullable — WIS2 data channel URI
     - title:             TextField, nullable — Original WME content title
     - display_title:     TextField, nullable — Computed human-readable title
-    - category:          TextField, nullable — Computed category
     - description:       TextField, nullable — Full text description
     - wnm:               JSONField, nullable — WIS2 Notification Message payload
     - errors:            JSONField, nullable — Error objects array
@@ -81,7 +80,20 @@ Zoom: 0.9 applied globally for size reduction
     - muted_until:       DateTimeField
     - Meta: unique_together = [('incident_hash', 'user')]
 
-2.8 Signals
+2.8 AlertRetentionPolicy (managed=True, db_table=alert_retention_policy) — singleton TTL setting
+    - id:                AutoField, PK (singleton row, id=1)
+    - ttl_active:        BooleanField, default=False — Master switch. False = persistence
+                         (keep alerts forever); True = purge by retention_days
+    - retention_days:    PositiveIntegerField, nullable — Alerts older than this many
+                         days (by ingested_at) are purged. Required when ttl_active=True.
+                         MinValueValidator(1). Ignored while ttl_active=False.
+    - updated_at:        DateTimeField, auto_now
+    - clean():           Raises ValidationError if ttl_active=True with no retention_days
+    - load():            classmethod — get_or_create the singleton row
+    - get_retention_days(): module helper in telemetry/models.py — returns retention_days
+                         only when ttl_active=True and days set; otherwise None
+
+2.9 Signals
     - post_save on User -> create_user_profile(): Auto-creates Profile on user creation
     - m2m_changed on User.groups -> sync_staff_on_group_change(): When a user is
       added/removed from the Admin group, is_staff is synced automatically
@@ -99,7 +111,7 @@ Zoom: 0.9 applied globally for size reduction
                                   user's active IncidentMute records
 
     parse_filter_params(request)  Extracts multi-value GET params: severity, node,
-                                  type, alert, category, source, time_from, time_to,
+                                  type, alert, source, time_from, time_to,
                                   sort (default: ingested_at)
 
     apply_filters(qs, params)     Applies all filter params to a queryset
@@ -110,26 +122,21 @@ Zoom: 0.9 applied globally for size reduction
     get_type_choices()            Distinct event_type values (max 500)
     get_source_choices()          Distinct source values
     get_alert_choices()           Distinct display_title values (max 500)
-    get_category_choices()        Distinct category values (max 500)
 
 3.2 View Functions
 
     dashboard (login_required) -> telemetry/dashboard.html
-        Time window filtering: ?window=all|12h|24h|custom with ?window_from= and ?window_to=
+        Time window filtering: ?window=all|12h|24h|custom&from=YYYY-MM-DDTHH:MM&to=YYYY-MM-DDTHH:MM
         Context:
             severity_counts      dict {CRITICAL: N, ERROR: N, WARNING: N, INFO: N}
-            urgent_alerts        CRITICAL alerts in configurable window, max 15
             mini_alerts          Latest 20 alerts by ingested_at
             critical_alerts      Latest 20 CRITICAL alerts
             type_choices         All distinct event_types
             node_choices         Node names (scoped to user)
             source_choices       All distinct sources
-            urgent_hours         Current urgent window setting
             ets_data             Latest ETS report per node with summary stats
-            ets_node_choices     Unique node_ids from ets_data
-            type_display         (event_type, count) for all types
-            category_display     (category, count) for all categories
             time_window          Current time window setting
+            window_from / window_to   Custom window bounds (datetime-local values)
 
     monitor_alerts (login_required) -> telemetry/alert_list.html
         Applies all filters, excludes muted, orders by sort, paginates (10/page).
@@ -138,26 +145,22 @@ Zoom: 0.9 applied globally for size reduction
             page_obj             Django paginator page object
             latest_ingested_iso  Max ingested_at for polling
             base_query           URL query string without page
-            type_choices / node_choices / source_choices / alert_choices / category_choices
+            type_choices / node_choices / source_choices / alert_choices
             current_severities / current_nodes / current_types / current_alerts /
-                current_categories / current_sources  Currently selected filter values
+                current_sources  Currently selected filter values
             current_time_from / current_time_to       Currently selected time range
             current_sort         event_time or ingested_at
 
     api_alerts (login_required) -> JSON
         GET params: since, offset, limit (default 50), all filter params
         Returns: {alerts: [{id, event_type, severity, source, node, node_id, title,
-                  display_title, category, description, event_time, subtype,
+                  display_title, description, event_time, subtype,
                   ingested_at}], count: N}
 
     api_alerts_per_day (login_required) -> JSON
-        GET params: days (7/14/30), node[], group_by (severity/event_type/none)
+        GET params: days (7/14/30), node[], group_by (severity/event_type)
         Returns: {labels: [date strings], datasets: [{label, data, borderColor, ...}]}
                  Used by Chart.js line chart
-
-    filter_options_api (login_required) -> JSON
-        Returns: Available filter values given current selections:
-                 {severity: [], type: [], node: [], source: [], category: [], alert: []}
 
     alert_detail (login_required) -> telemetry/detail.html
         Loads alert, parses tests (list or dict) and summary, queries node history
@@ -223,7 +226,6 @@ Zoom: 0.9 applied globally for size reduction
     api/alert-exists/<uuid:alert_id>/                -> alert_exists
     api/alerts/per-day/                              -> api_alerts_per_day
     api/alerts/                                      -> api_alerts
-    api/alerts/filter-options/                       -> filter_options_api
     api/alert/<uuid:alert_id>/history/               -> alert_history_fragment
     login/                                           -> LoginView
     logout/                                          -> LogoutView(next_page='login')
@@ -256,7 +258,7 @@ Zoom: 0.9 applied globally for size reduction
 -----------------------------------------
 
 6.1 base.html — Shared Layout
-    - Sticky Header: Brand mark, title "WIS2 Global Telemetry", subtitle block,
+    - Sticky Header: Brand mark, title "WIS2 Monitoring Events", subtitle block,
       nav links (Dashboard, Monitor Alerts), find-alert search box, hamburger menu
     - Side Menu (slide-in from right): User avatar (first letter), greeting,
       theme toggle, Account link, Documentation link, Logout button
@@ -272,31 +274,27 @@ Zoom: 0.9 applied globally for size reduction
          CRITICAL / ERROR / WARNING / INFO counts, each links to monitor_alerts
          filtered by severity. Animated bump+flash on new data.
 
-      2. Category Cards (horizontal flex row)
-         Dynamic count cards per category (6 color cycle), links to monitor_alerts
-         filtered by category. Bump animation.
-
-      3. Alerts per Day Chart (Chart.js line chart)
-         Controls: Group by (Severity/Type/Total), Days (7/14/30),
+      2. Alerts per Day Chart (Chart.js line chart)
+         Controls: Group by (Severity/Type), Days (7/14/30),
          Node multi-select dropdown. Fetches from /api/alerts/per-day/.
 
-      4. ETS Reports (horizontal scrollable card grid)
+      3. ETS Reports (horizontal scrollable card grid)
          Per-node latest test report cards. Each shows node name, timestamp,
          summary stats (PASSED/FAILED/SKIPPED etc.). Yellow/red border for issues.
          Controls: Node filter dropdown, Issues toggle.
 
     Side Panel Components:
-      1. CRITICAL Feed — Latest 20 CRITICAL alerts, auto-updates via polling
+      1. CRITICAL Feed — Latest 20 CRITICAL alerts, auto-updates via WebSocket
       2. Live Feed — Latest 20 alerts with multi-select filters
          (Severity, Type, Node, Source). New items slide in with animation.
 
     Header Controls:
-      - Time window dropdown (All Time / Last 12h / Last 24h / Custom)
+      - Time window dropdown (All Time / Last 12h / Last 24h)
       - Find Alert ID search box
 
     JavaScript Features:
-      - 5-second polling for live feed and critical feed updates
-      - Client-side severity/category count incrementing with bump animations
+      - WebSocket (ws/alerts/) live feed + critical feed updates
+      - Client-side severity count incrementing with bump animations
       - Chart.js with theme-aware colors, dynamic data fetching
       - ETS node filtering and issues toggle
       - Find Alert by UUID
@@ -307,7 +305,7 @@ Zoom: 0.9 applied globally for size reduction
     Components:
       1. Filter Bar — Multi-select dropdowns for: Severity (4 checkboxes),
          Type (searchable), Node (searchable), Source (searchable),
-         Category (searchable), Alert (display_title, searchable).
+         Alert (display_title, searchable).
          DateTime pickers for From/To. Filter + Clear buttons.
 
       2. Column Labels — Time (UTC)/Received at (sortable), Severity, Type,
@@ -322,8 +320,7 @@ Zoom: 0.9 applied globally for size reduction
       5. Empty State — Icon + message when no alerts match
 
     JavaScript Features:
-      - 15-second polling for new alerts (sorted insertion, animation)
-      - Client-side filter option cascading via /api/alerts/filter-options/ API
+      - WebSocket (ws/alerts/) new-alert banner with sorted insertion
       - Sort toggle (event_time vs ingested_at)
       - Find Alert by UUID
 
@@ -385,7 +382,7 @@ Zoom: 0.9 applied globally for size reduction
     Layout: Two-column: sticky sidebar nav + scrollable content
 
     Sidebar sections:
-      Overview: Introduction, Architecture, Severity, Event Types, Categories
+      Overview: Introduction, Architecture, Severity, Event Types
       Infrastructure Analysis: Broker Disconnections, Cache & Data Flow,
           Protocol Terminations, Schema Validation
       Systemic Telemetry: Lifecycle & Threats, Response Framework
@@ -398,7 +395,6 @@ Zoom: 0.9 applied globally for size reduction
       - WME architecture (CloudEvents, MQTT topic hierarchy)
       - Severity level reference table
       - Event type reference table (7 URIs)
-      - Category classification rules
       - Broker disconnections (redundancy degradation, total isolation)
       - Cache & data flow disruptions (ghosting, rate limiting)
       - Protocol/endpoint terminations (timeouts, EOF, access denials)
@@ -412,9 +408,11 @@ Zoom: 0.9 applied globally for size reduction
       - Source citations (5 references with live links)
 
 6.7 login.html — Login Page
-    Layout: Centered card (max-width 400px), overrides header/sidebar blocks
-    Components: Theme toggle button (top-right), title "WIS2 Telemetry",
-    subtitle "Station Watch", error display, Username/Password form, Sign In button
+    Layout: Full-screen background (background.png) with animated aurora/grid
+    effects and rising particles, centered auth card
+    Components: Crest logo + MarocMeteo/WMO agency logos, title
+    "WIS2 Monitoring Events", error display, Username/Password form,
+    Sign In button
 
 6.8 history_fragment.html — AJAX Fragment
     Purpose: Returns paginated node history HTML for AJAX loading in detail page
@@ -429,7 +427,7 @@ Zoom: 0.9 applied globally for size reduction
     Broker:       globalbroker.meteo.fr:443 via WebSocket (/mqtt)
     Auth:         everyone/everyone
     Topic:        monitor/a/wis2/#
-    DB:           PostgreSQL wis2_alerts, user ingestion_user
+    DB:           PostgreSQL wis2_alerts, user wis2_admin
     Batch:        250 records, 5-second flush interval
     Reconnect:    5s delay, max 10 attempts
 
@@ -444,18 +442,9 @@ Zoom: 0.9 applied globally for size reduction
                  datacontenttype, dataschema
       data.:     conformsTo, severity, subtype, links
       data.content.: channel, title, description, wnm, errors, tests, summary, links
-    Computes: category, display_title, incident_hash
+    Computes: display_title, incident_hash
 
-7.4 _compute_category(title, description) — Classification Rules
-    Title starts with "WCMP2"                                     -> The title itself
-    Title starts with "Disconnected WIS2 Node"                    -> "Node Disconnections"
-    Contains "maintenance" or "template:"                         -> "Maintenance"
-    Cache/data flow patterns (download errors, no data, etc.)     -> "Global Cache & Data Flow"
-    "Missing Metadata record" or "WIS2 Notification Message..."  -> "Schema & Metadata Validation"
-    Endpoint error patterns (deadline exceeded, EOF, etc.)        -> "Endpoint & Protocol Errors"
-    No pattern matched                                            -> The raw title
-
-7.5 _compute_display_title(title, description) — Display Title Rules (19 patterns)
+7.4 _compute_display_title(title, description) — Display Title Rules (19 patterns)
     "Template:" in title                    -> "Maintenance: Template Notice"
     "un-wmo-global-test" in title           -> "Maintenance: Test System"
     "CMA Global Monitor" in title           -> "Maintenance: CMA Global Monitor"
@@ -477,7 +466,7 @@ Zoom: 0.9 applied globally for size reduction
     Title starts with "Target" + "is down"  -> "Target is down"
     No pattern matched                      -> Raw title as-is
 
-7.6 DB Writer Thread
+7.5 DB Writer Thread
     Batches up to 250 records, flushes every 5s or when queue is empty
     ON CONFLICT (id) DO NOTHING for idempotent inserts
     Auto-creates missing nodes on FK violation (regex extracts node name from error)
@@ -493,6 +482,31 @@ Zoom: 0.9 applied globally for size reduction
     idx_wgt_event_type            alerts  ON alerts (event_type)
     idx_wgt_errors_not_null       alerts  ON alerts (errors) WHERE errors IS NOT NULL (partial)
     IncidentEvent.incident_hash   incident_events  db_index=True (B-tree)
+
+
+8.5 ALERT RETENTION (TTL)
+---------------------------
+
+    Config (admin panel):  Alert retention policy -> ttl_active (master switch) and
+                           retention_days (days). TTL off = persistence (default),
+                           days ignored. TTL on = purge by days (days required).
+
+    Basis:                 alerts.ingested_at < now - retention_days
+                           (uses idx_wgt_ingested_at)
+
+    Command:               python manage.py purge_alerts
+                           --dry-run   preview only, no deletes
+                           --days N    override configured days for this run
+                           --limit N   cap total alerts purged
+                           Batches of 5000, transaction per batch
+
+    Cascade:               Deletes incident_events (history) tied to purged
+                           alerts first (FK db_constraint=False, so no DB
+                           cascade); keeps incident_mutes (hash-keyed)
+
+    Scheduling:            systemd timer wis2-purge.timer -> wis2-purge.service
+                           (nightly 03:00, Persistent=true, 30min jitter)
+                           Templates in README "Alert retention (TTL)"
 
 
 9. SETTINGS (wis2_monitor/settings.py)

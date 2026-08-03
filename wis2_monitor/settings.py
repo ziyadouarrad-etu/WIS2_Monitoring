@@ -173,6 +173,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'images']
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'

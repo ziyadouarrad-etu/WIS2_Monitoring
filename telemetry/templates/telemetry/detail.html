@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Incident {{ alert.id|truncatechars:10 }} - WIS2 Telemetry</title>
+<title>Incident {{ alert.id|truncatechars:10 }} - WIS2 Monitoring Events</title>
 <link rel="stylesheet" href="{% static 'telemetry/fonts/fonts.css' %}">
 <style>
 :root {
@@ -118,11 +118,6 @@ body::after {
 .header .subtitle { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; }
 .header-right { display: flex; align-items: center; gap: 22px; position: relative; z-index: 1; }
 .header-right button, .header-right .nav-link, .header-right input, .header-right .fa-btn { font-size: 12px; padding: 4px 10px; border-radius: 4px; }
-.header-time {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-muted);
-}
 .nav-link {
   font-family: var(--font-mono); font-size: 12px; font-weight: 600;
   color: var(--accent); text-decoration: none; text-transform: uppercase;
@@ -329,12 +324,6 @@ body::after {
   font-weight: 600;
   color: var(--text);
 }
-.hero-subject {
-  display: block;
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
 .hero-id-line {
   font-family: var(--font-mono);
   font-size: 14px;
@@ -514,6 +503,70 @@ body::after {
 }
 .email-status.error { display: block; background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical); }
 .email-status.success { display: block; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+/* Raw JSON button */
+.raw-btn {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  padding: 7px 16px; margin-bottom: 16px;
+  background: transparent; border: 1px solid var(--accent);
+  color: var(--accent); border-radius: 4px; cursor: pointer;
+  transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+}
+.raw-btn:hover { background: var(--accent); color: #06231f; }
+/* Raw JSON modal */
+.rawjson-overlay {
+  display: none; position: fixed; inset: 0; z-index: 99997;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(3px);
+}
+.rawjson-overlay.open { display: block; }
+.rawjson-modal {
+  display: none; position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); z-index: 99998;
+  width: 90vw; max-width: 1200px; max-height: 86vh;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  font-family: var(--font-mono); flex-direction: column;
+}
+.rawjson-modal.open { display: flex; }
+.rawjson-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+.rawjson-modal-close {
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+  font-size: 18px; cursor: pointer; border-radius: 4px;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+}
+.rawjson-modal-close:hover { border-color: var(--accent); color: var(--accent); }
+.rawjson-modal-body {
+  flex: 1; min-height: 0; overflow: auto; margin: 14px 18px;
+  background: var(--bg-inset); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.rawjson-pre {
+  margin: 0; padding: 16px 18px;
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6;
+  color: var(--text-secondary); white-space: pre-wrap; word-break: break-all;
+}
+.rawjson-modal-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 18px; border-top: 1px solid var(--border);
+}
+.rawjson-copy-feedback {
+  font-size: 11px; color: var(--success); align-self: center;
+  margin-right: auto; display: none;
+}
+.rawjson-copy-feedback.show { display: inline; }
+.rawjson-btn {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  padding: 6px 14px; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+}
+.rawjson-btn:hover { border-color: var(--accent); color: var(--accent); }
+.rawjson-btn-primary {
+  background: var(--accent); border: 1px solid var(--accent); color: #06231f;
+}
+.rawjson-btn-primary:hover { box-shadow: 0 0 12px rgba(77,208,196,0.3); color: #06231f; }
 .section-label {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -663,11 +716,183 @@ body::after {
 .test-message-failed { color: var(--critical); background: var(--critical-bg); border-left-color: var(--critical); }
 .test-message-skipped { color: var(--skipped); background: var(--skipped-bg); border-left-color: var(--skipped); }
 .test-message-unknown { color: var(--info); background: var(--info-bg); border-left-color: var(--info); }
-.test-empty {
+
+/* ---------- KPI ---------- */
+.kpi-overall {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.kpi-grade-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 96px;
+  border: 1px solid var(--border);
+  border-top-width: 3px;
+  border-radius: var(--radius-sm);
+  padding: 12px 18px;
+  background: var(--bg-inset);
+}
+.kpi-grade {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+.kpi-grade-a { border-top-color: var(--success); color: var(--success); }
+.kpi-grade-b { border-top-color: var(--accent); color: var(--accent); }
+.kpi-grade-c { border-top-color: var(--warning); color: var(--warning); }
+.kpi-grade-d { border-top-color: var(--critical); color: var(--critical); }
+.kpi-grade-f { border-top-color: var(--critical); color: var(--critical); }
+.kpi-grade-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.kpi-overall-stat {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid var(--border);
+  border-top-width: 3px;
+  border-top-color: var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  text-align: center;
+  background: var(--bg-inset);
+}
+.kpi-overall-value {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+}
+.kpi-overall-total { color: var(--text-muted); font-size: 18px; }
+.kpi-overall-stat-good { border-top-color: var(--success); }
+.kpi-overall-stat-critical { border-top-color: var(--critical); }
+.kpi-overall-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.kpi-card {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  background: var(--bg-inset);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: 0 10px 20px -14px rgba(0,0,0,0.6);
+}
+.kpi-card-good { border-left-color: var(--success); }
+.kpi-card-critical { border-left-color: var(--critical); }
+.kpi-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.kpi-card-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+}
+.kpi-card-score {
   font-family: var(--font-mono);
   font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.kpi-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-top: 2px;
+}
+.kpi-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.kpi-bar-good { background: var(--success); }
+.kpi-bar-critical { background: var(--critical); }
+.kpi-bar-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+.kpi-bar-pct {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.kpi-bar-note {
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
-  padding: 12px 0;
+}
+.kpi-bar-note-only {
+  margin: 8px 0;
+}
+.kpi-comments {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpi-comments li {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+.kpi-no-issues {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--success);
+  margin-top: 10px;
+}
+.kpi-card-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  word-break: break-all;
+  line-height: 1.4;
 }
 
 /* ---------- Summary ---------- */
@@ -763,22 +988,7 @@ body::after {
   border-bottom: 1px solid var(--border);
 }
 
-/* Identity strip: id / type / specversion */
-.wnm-identity {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.wnm-id {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--text);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 4px 10px;
-}
+/* Identity fields (id / type / specversion) reuse the labeled deflist rows */
 .wnm-badge {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1454,7 +1664,7 @@ body::after {
     <button type="button" class="btn-back" onclick="window.history.back()" title="Go back">&#8592; Back</button>
     <div class="brand">
       <span class="mark">&#9670;</span>
-      <h1>WIS2 Global Telemetry</h1>
+      <h1>WIS2 Monitoring Events</h1>
       <span class="subtitle">Incident Detail</span>
     </div>
   </div>
@@ -1514,6 +1724,7 @@ body::after {
 <div class="container">
   <div class="card hero-card hero-card-{{ alert.severity|lower }}">
     <div class="card-body">
+      <button type="button" class="raw-btn" id="rawJsonBtn">&#123;&#125; See Full Raw JSON</button>
       <div class="hero">
         <div class="hero-rail hero-rail-{{ alert.severity|lower }}"></div>
         <div class="hero-body">
@@ -1524,9 +1735,6 @@ body::after {
           <div class="hero-byline">
             <span class="hero-label">Title:</span>
             <span class="hero-value">{{ alert.title|default:"Untitled Alert" }}</span>
-            {% if alert.subject %}
-            <span class="hero-subject">{{ alert.subject }}</span>
-            {% endif %}
           </div>
           <div class="hero-id-line">
             <span class="hero-label">ID:</span>
@@ -1602,6 +1810,24 @@ body::after {
     </div>
   </div>
 
+  {{ raw_json|json_script:"alert-raw-json" }}
+
+  <div class="rawjson-overlay" id="rawJsonOverlay"></div>
+  <div class="rawjson-modal" id="rawJsonModal">
+    <div class="rawjson-modal-header">
+      <span>Raw Alert JSON</span>
+      <button type="button" class="rawjson-modal-close" id="rawJsonClose">&times;</button>
+    </div>
+    <div class="rawjson-modal-body">
+      <pre class="rawjson-pre" id="rawJsonPre"></pre>
+    </div>
+    <div class="rawjson-modal-footer">
+      <span class="rawjson-copy-feedback" id="rawJsonCopyFeedback">Copied!</span>
+      <button type="button" class="rawjson-btn" id="rawJsonCopyBtn">Copy JSON</button>
+      <button type="button" class="rawjson-btn rawjson-btn-primary" id="rawJsonDoneBtn">Close</button>
+    </div>
+  </div>
+
   {% if alert.description %}
   <div class="card">
     <div class="card-body">
@@ -1611,16 +1837,22 @@ body::after {
   </div>
   {% endif %}
 
-  {% if tests_list or summary_dict or alert.wnm or alert.errors %}
+  {% if ets_tests or kpi_tests or summary_dict or alert.wnm or alert.errors %}
   <div class="card">
     <div class="tabs-header" id="tabs-header">
-      {% if tests_list %}
+      {% if ets_tests %}
       <button class="tab-btn active" data-tab="tests">
-        Tests
-        <span class="tab-count">{{ tests_list|length }}</span>
+        Tests (ETS)
+        <span class="tab-count">{{ ets_tests|length }}</span>
       </button>
       {% endif %}
-      {% if summary_dict %}
+      {% if kpi_tests %}
+      <button class="tab-btn" data-tab="kpi">
+        KPIs
+        <span class="tab-count">{{ kpi_tests|length }}</span>
+      </button>
+      {% endif %}
+      {% if summary_dict and not is_kpi_report %}
       <button class="tab-btn" data-tab="summary">Summary</button>
       {% endif %}
       {% if alert.wnm %}
@@ -1634,11 +1866,12 @@ body::after {
       {% endif %}
     </div>
     <div class="card-body">
-      {% if tests_list %}
+      {% if ets_tests %}
       <div class="tab-pane active" id="tab-tests">
         <div class="test-grid">
-          {% for test in tests_list %}
-          {% with status=test.status|default:test.code|default:"UNKNOWN"|upper %}
+          {% for test in ets_tests %}
+          {% firstof test.status test.code "UNKNOWN" as status_raw %}
+          {% with status=status_raw|upper %}
           <div class="test-card {% if status == 'PASSED' or status == 'SUCCESS' %}test-card-passed{% elif status == 'FAILED' or status == 'ERROR' %}test-card-failed{% elif status == 'SKIPPED' %}test-card-skipped{% else %}test-card-unknown{% endif %}">
             <div class="test-card-header">
               <div class="test-card-name">{% firstof test.id test.name "Test" %}</div>
@@ -1654,7 +1887,69 @@ body::after {
       </div>
       {% endif %}
 
-      {% if summary_dict %}
+      {% if kpi_tests %}
+      <div class="tab-pane" id="tab-kpi">
+        {% if kpi_overall %}
+        <div class="kpi-overall">
+          {% if kpi_overall.grade %}
+          <div class="kpi-grade-wrap kpi-grade-{{ kpi_overall.grade|lower }}">
+            <span class="kpi-grade">{{ kpi_overall.grade }}</span>
+            <span class="kpi-grade-label">Grade</span>
+          </div>
+          {% endif %}
+          {% if kpi_overall.score is not None and kpi_overall.total is not None %}
+          <div class="kpi-overall-stat">
+            <div class="kpi-overall-value">{{ kpi_overall.score }}<span class="kpi-overall-total"> / {{ kpi_overall.total }}</span></div>
+            <div class="kpi-overall-label">Score</div>
+          </div>
+          {% endif %}
+          {% if kpi_overall.percentage is not None %}
+          <div class="kpi-overall-stat {% if kpi_overall.percentage == 100 %}kpi-overall-stat-good{% else %}kpi-overall-stat-critical{% endif %}">
+            <div class="kpi-overall-value">{{ kpi_overall.percentage|floatformat:1 }}<span class="kpi-overall-total">%</span></div>
+            <div class="kpi-overall-label">Percentage</div>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="kpi-grid">
+          {% for k in kpi_tests %}
+          <div class="kpi-card {% if k.percentage is not None and k.percentage != 100 %}kpi-card-critical{% else %}kpi-card-good{% endif %}">
+            <div class="kpi-card-header">
+              <div class="kpi-card-title">{{ k.title|default:k.id }}</div>
+              {% if k.score is not None and k.total is not None %}
+              <span class="kpi-card-score">{{ k.score }} / {{ k.total }}</span>
+              {% endif %}
+            </div>
+            {% if k.percentage is not None %}
+            <div class="kpi-bar">
+              <div class="kpi-bar-fill {% if k.percentage == 100 %}kpi-bar-good{% else %}kpi-bar-critical{% endif %}" style="width: {% widthratio k.percentage 100 100 %}%"></div>
+            </div>
+            <div class="kpi-bar-meta">
+              <span class="kpi-bar-pct">{{ k.percentage|floatformat:1 }}%</span>
+              {% if k.total == 0 %}<span class="kpi-bar-note">No data</span>{% endif %}
+            </div>
+            {% elif k.total == 0 %}
+            <div class="kpi-bar-note kpi-bar-note-only">No data</div>
+            {% endif %}
+            {% if k.comments %}
+            <ul class="kpi-comments">
+              {% for c in k.comments %}
+              <li>{{ c }}</li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <div class="kpi-no-issues">No issues</div>
+            {% endif %}
+            {% if k.id %}
+            <div class="kpi-card-id" title="{{ k.id }}">{{ k.id }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if summary_dict and not is_kpi_report %}
       <div class="tab-pane" id="tab-summary">
         <div class="summary-grid">
           {% for key, val in summary_dict.items %}
@@ -1684,44 +1979,7 @@ body::after {
   {% if history_page_obj %}
   <div class="card">
     <div class="card-body" id="historyContainer">
-      <div class="history-header">
-        <div class="section-label" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">Node History</div>
-        <span class="history-count">{{ history_count }} total</span>
-      </div>
-      <div class="history-grid">
-        {% for h in history_page_obj %}
-        <a href="{% url 'alert_detail' h.id %}" class="history-card">
-          <div class="history-card-inner">
-            <span class="history-time">{{ h.event_time|date:"Y-m-d H:i" }}</span>
-            <span class="history-sev history-sev-{{ h.severity|lower }}">{{ h.severity }}</span>
-            <span class="history-title">{{ h.display_title|default:h.title|default:h.event_type }}{% if h.subtype %} <small>({{ h.subtype }})</small>{% endif %}</span>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-      {% if history_page_obj.paginator.num_pages > 1 %}
-      <div class="history-pagination">
-        {% if history_page_obj.has_previous %}
-          <a class="history-page-link" href="#" data-page="{{ history_page_obj.previous_page_number }}">&#8592; Prev</a>
-        {% else %}
-          <span class="history-page-link history-page-disabled">&#8592; Prev</span>
-        {% endif %}
-        {% for p in history_page_obj.paginator.page_range %}
-          {% if p == history_page_obj.number %}
-            <span class="history-page-link history-page-current">{{ p }}</span>
-          {% elif p == 1 or p == history_page_obj.paginator.num_pages or p >= history_page_obj.number|add:"-2" and p <= history_page_obj.number|add:"2" %}
-            <a class="history-page-link" href="#" data-page="{{ p }}">{{ p }}</a>
-          {% elif p == history_page_obj.number|add:"-3" or p == history_page_obj.number|add:"3" %}
-            <span class="history-page-link history-page-disabled">&#8230;</span>
-          {% endif %}
-        {% endfor %}
-        {% if history_page_obj.has_next %}
-          <a class="history-page-link" href="#" data-page="{{ history_page_obj.next_page_number }}">Next &#8594;</a>
-        {% else %}
-          <span class="history-page-link history-page-disabled">Next &#8594;</span>
-        {% endif %}
-      </div>
-      {% endif %}
+      {% include "telemetry/history_fragment.html" %}
     </div>
   </div>
   {% endif %}
@@ -1891,6 +2149,62 @@ body::after {
     }
   })();
 
+  })();
+
+  /* raw JSON modal */
+  (function(){
+    var rawScript = document.getElementById('alert-raw-json');
+    var rawData = {};
+    if (rawScript) {
+      try { rawData = JSON.parse(rawScript.textContent); } catch (e) { rawData = {}; }
+    }
+    var btn = document.getElementById('rawJsonBtn');
+    var modal = document.getElementById('rawJsonModal');
+    var overlay = document.getElementById('rawJsonOverlay');
+    var closeBtn = document.getElementById('rawJsonClose');
+    var doneBtn = document.getElementById('rawJsonDoneBtn');
+    var copyBtn = document.getElementById('rawJsonCopyBtn');
+    var pre = document.getElementById('rawJsonPre');
+    var feedback = document.getElementById('rawJsonCopyFeedback');
+    var feedbackTimer = null;
+    function openModal() {
+      if (pre) pre.textContent = JSON.stringify(rawData, null, 2);
+      modal.classList.add('open'); overlay.classList.add('open');
+    }
+    function closeModal() {
+      modal.classList.remove('open'); overlay.classList.remove('open');
+    }
+    if (btn) btn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (doneBtn) doneBtn.addEventListener('click', closeModal);
+    if (overlay) overlay.addEventListener('click', closeModal);
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function(){
+        var text = JSON.stringify(rawData, null, 2);
+        function done() {
+          if (feedback) {
+            feedback.classList.add('show');
+            if (feedbackTimer) clearTimeout(feedbackTimer);
+            feedbackTimer = setTimeout(function(){ feedback.classList.remove('show'); }, 1500);
+          }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done)['catch'](function(){});
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+          done();
+        }
+      });
+    }
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape' && modal && modal.classList.contains('open')) closeModal();
+    });
   })();
 
   function showToast(text) {

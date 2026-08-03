@@ -171,18 +171,26 @@ def _render_props(d):
 
 
 def _render_identity(value):
-    chips = []
+    """Identity fields (id / type / specversion) rendered as labeled rows."""
+    rows = []
     if value.get('id'):
-        full = escape(str(value['id']))
-        short = full if len(full) <= 28 else full[:12] + '&hellip;' + full[-10:]
-        chips.append(f'<span class="wnm-id" title="{full}">{short}</span>')
+        rows.append(
+            '<div class="wnm-dt-row"><span class="wnm-dt">id</span>'
+            f'<span class="wnm-dd">{escape(str(value["id"]))}</span></div>'
+        )
     if value.get('type'):
-        chips.append(f'<span class="wnm-badge wnm-badge-type">{escape(str(value["type"]))}</span>')
+        rows.append(
+            '<div class="wnm-dt-row"><span class="wnm-dt">type</span>'
+            f'<span class="wnm-dd wnm-badge wnm-badge-type">{escape(str(value["type"]))}</span></div>'
+        )
     if value.get('specversion'):
-        chips.append(f'<span class="wnm-badge wnm-badge-spec">spec {escape(str(value["specversion"]))}</span>')
-    if not chips:
+        rows.append(
+            '<div class="wnm-dt-row"><span class="wnm-dt">specversion</span>'
+            f'<span class="wnm-dd wnm-badge wnm-badge-spec">{escape(str(value["specversion"]))}</span></div>'
+        )
+    if not rows:
         return ''
-    return '<div class="wnm-identity">' + ''.join(chips) + '</div>'
+    return '<div class="wnm-deflist">' + ''.join(rows) + '</div>'
 
 
 def _render_geometry(geom):
@@ -284,10 +292,14 @@ def render_wnm(value):
 
         sections = []
 
-        # Identity section — compact chips for id / type / specversion
+        # Identity section — labeled rows for id / type / specversion
         r = _render_identity(value)
         if r:
-            sections.append('<div class="wnm-section">' + r + '</div>')
+            sections.append(
+                '<div class="wnm-section">'
+                '<div class="wnm-section-label">Identity</div>'
+                + r + '</div>'
+            )
 
         # Every other non-empty key gets its own bordered section
         for key in value:

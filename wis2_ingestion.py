@@ -205,7 +205,8 @@ def parse_wmem_record(payload_json):
             Json(errors) if errors else None,
             Json(tests) if tests else None,
             Json(summary) if summary else None,
-            Json(links) if links else None
+            Json(links) if links else None,
+            Json(payload_json) if payload_json else None
         )
     except Exception as e:
         logger.warning(f"Parse Warning: Structure invalide - {e}")
@@ -252,7 +253,7 @@ def db_writer_worker():
                                                        channel, \
                                                        title, description, display_title, \
                                                        incident_hash, wnm, errors, tests, summary, \
-                                                       links) \
+                                                       links, raw_json) \
                    VALUES %s
                    ON CONFLICT (id) DO NOTHING; \
                    """

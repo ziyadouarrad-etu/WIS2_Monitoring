@@ -1,7 +1,7 @@
 {% extends "telemetry/base.html" %}
 {% load monitor_extras %}
 
-{% block title %}WIS2 Global Telemetry — Monitor{% endblock %}
+{% block title %}WIS2 Monitoring Events — Monitor{% endblock %}
 
 {% block header_subtitle %}Monitor{% endblock %}
 
@@ -25,47 +25,10 @@ body::before {
   background-size: 64px 64px;
   mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 75%);
 }
-.live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 5px 11px;
-  border-radius: 20px;
-  border: 1px solid rgba(77,208,196,0.25);
-  background: var(--accent-dim);
-  cursor: help;
-}
-.live-ring {
-  position: relative;
-  width: 8px; height: 8px;
-}
-.live-ring::before, .live-ring::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.live-ring::after {
-  box-shadow: 0 0 6px rgba(77,208,196,0.7);
-}
-.live-ring::before {
-  animation: ripple 1.8s ease-out infinite;
-}
-@keyframes ripple {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(3.2); opacity: 0; }
-}
 .filters {
   position: relative;
   z-index: 100;
-  padding: 18px 32px;
+  padding: 18px clamp(32px, 3vw, 64px);
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
 }
@@ -118,7 +81,7 @@ body::before {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-size: clamp(13px, 0.85vw, 15px);
   font-family: var(--font-mono);
   transition: border-color 0.2s;
   outline: none;
@@ -144,7 +107,7 @@ body::before {
   font-weight: 600;
   font-family: var(--font-display);
   cursor: pointer;
-  font-size: 13px;
+  font-size: clamp(13px, 0.85vw, 15px);
   letter-spacing: 0.02em;
   transition: all 0.2s;
   white-space: nowrap;
@@ -163,10 +126,10 @@ body::before {
 .col-labels {
   display: grid;
   grid-template-columns: 1.5fr 0.8fr 1.2fr 1.2fr 2.5fr;
-  gap: 14px;
-  padding: 10px 16px 6px;
+  gap: clamp(14px, 1.2vw, 24px);
+  padding: clamp(10px, 0.8vw, 16px) clamp(16px, 1.2vw, 24px) clamp(6px, 0.5vw, 10px);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: clamp(11px, 0.7vw, 13px);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -181,7 +144,7 @@ body::before {
 .sort-btn:hover { color: var(--accent); }
 .sort-btn.sort-active { color: var(--accent); }
 .sort-divider { color: var(--border); margin: 0 2px; }
-.container { position: relative; z-index: 1; padding: 18px 28px 40px; max-width: 1600px; margin: 0 auto; }
+.container { position: relative; z-index: 1; padding: 18px clamp(28px, 3vw, 64px) 40px; }
 .alerts { display: flex; flex-direction: column; gap: 5px; }
 .alert-row {
   display: block;
@@ -272,8 +235,8 @@ body::before {
 .alert-inner {
   display: grid;
   grid-template-columns: 1.5fr 0.8fr 1.2fr 1.2fr 2.5fr;
-  gap: 14px;
-  padding: 12px 16px;
+  gap: clamp(14px, 1.2vw, 24px);
+  padding: clamp(12px, 1vw, 20px) clamp(16px, 1.2vw, 24px);
   align-items: center;
   border-radius: var(--radius);
   box-shadow: inset 3px 0 0 transparent;
@@ -284,13 +247,13 @@ body::before {
 .alert-info .alert-inner { box-shadow: inset 3px 0 0 var(--info); }
 .cell-time {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: clamp(14px, 1vw, 17px);
   color: var(--text-muted);
   white-space: nowrap;
 }
 .cell-sev {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: clamp(11px, 0.75vw, 14px);
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #06141a;
@@ -308,20 +271,20 @@ body::before {
 .cell-sev-info { background: var(--info); }
 .cell-type {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: clamp(14px, 1vw, 17px);
   color: var(--text-secondary);
   word-break: break-all;
 }
 .cell-node {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: clamp(14px, 1vw, 17px);
   color: var(--text-secondary);
   word-break: break-all;
 }
 .cell-title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 15px;
+  font-size: clamp(15px, 1.1vw, 19px);
   color: var(--text);
   word-break: break-word;
   line-height: 1.4;
@@ -397,29 +360,6 @@ body::before {
   color: var(--text-muted);
   min-width: 24px;
 }
-.footer {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  padding: 20px 28px 32px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border);
-  margin-top: 12px;
-}
-.footer code {
-  background: var(--bg-card);
-  padding: 1px 6px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-.footer .live-status {
-  color: var(--accent);
-  font-weight: 600;
-}
 @media (max-width: 1000px) {
   .alert-inner { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
   .alert-inner .cell-time { grid-column: 1 / -1; }
@@ -444,7 +384,7 @@ body::before {
   display: flex; align-items: center; justify-content: space-between;
   width: 100%; padding: 8px 10px; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--bg); color: var(--text);
-  font-size: 13px; font-family: var(--font-mono); cursor: pointer;
+  font-size: clamp(13px, 0.85vw, 15px); font-family: var(--font-mono); cursor: pointer;
   transition: border-color 0.2s; text-align: left; gap: 6px;
 }
 .msd-trigger:hover, .msd-trigger:focus {
@@ -473,7 +413,7 @@ body::before {
 .msd-option {
   display: flex; align-items: center; gap: 6px; padding: 4px 10px;
   cursor: pointer; transition: background 0.08s;
-  font-size: 13px; font-family: var(--font-mono); color: var(--text-secondary);
+  font-size: clamp(13px, 0.85vw, 15px); font-family: var(--font-mono); color: var(--text-secondary);
   border-left: 2px solid transparent;
 }
 .msd-option:hover { background: var(--bg-elevated); border-left-color: var(--accent); }
@@ -489,7 +429,7 @@ body::before {
 }
 .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
 @media (prefers-reduced-motion: reduce) {
-  .header::after, .live-ring::before, .alert-row.new, #new-alerts-banner .banner-dot { animation: none; }
+  .header::after, .alert-row.new, #new-alerts-banner .banner-dot { animation: none; }
 }
 #new-alerts-banner {
   display: none;

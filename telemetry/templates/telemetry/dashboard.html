@@ -2,14 +2,14 @@
 {% load monitor_extras %}
 {% load static %}
 
-{% block title %}WIS2 Global Telemetry — Dashboard{% endblock %}
+{% block title %}WIS2 Monitoring Events — Dashboard{% endblock %}
 
 {% block header_subtitle %}Dashboard{% endblock %}
 
 {% block header_links %}
 <button type="button" id="windowToggleBtn" style="font-family:var(--font-mono);font-weight:600;border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent);cursor:pointer;text-transform:uppercase;letter-spacing:0.08em;display:flex;align-items:center;gap:6px;transition:all 0.15s;">
   <span id="windowToggleText">
-    {% if time_window == '12h' %}Last 12h{% elif time_window == '24h' %}Last 24h{% else %}All Time{% endif %}
+    {% if time_window == '12h' %}Last 12h{% elif time_window == '24h' %}Last 24h{% elif time_window == 'custom' %}{{ window_from }} → {{ window_to }}{% else %}All Time{% endif %}
   </span>
   <span style="font-size:8px;">&#9662;</span>
 </button>
@@ -48,11 +48,9 @@ body::before {
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 20px;
-  padding: 24px 28px;
-  max-width: 1600px;
-  margin: 0 auto;
+  grid-template-columns: 1fr minmax(300px, 400px);
+  gap: clamp(16px, 1.5vw, 32px);
+  padding: clamp(24px, 2vw, 48px) clamp(28px, 3vw, 64px);
   position: relative;
   z-index: 1;
   align-items: start;
@@ -68,7 +66,7 @@ body::before {
 .severity-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: clamp(12px, 1vw, 20px);
 }
 .sev-card {
   display: flex;
@@ -90,13 +88,13 @@ body::before {
 }
 .sev-card .count {
   font-family: var(--font-display);
-  font-size: 36px;
+  font-size: clamp(36px, 2.5vw, 48px);
   font-weight: 700;
   line-height: 1;
 }
 .sev-card .label {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: clamp(11px, 0.75vw, 14px);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -152,10 +150,10 @@ body::before {
   margin-bottom: 14px;
 }
 .chart-header {
-  padding: 10px 14px;
+  padding: clamp(10px, 0.9vw, 16px) clamp(14px, 1.2vw, 22px);
   border-bottom: 1px solid var(--border);
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: clamp(13px, 0.85vw, 16px);
   font-weight: 600;
   color: var(--text-secondary);
   display: flex;
@@ -225,8 +223,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  position: sticky;
-  top: 92px;
+  position: static;
   z-index: 10;
   isolation: isolate;
 }
@@ -249,57 +246,26 @@ body::before {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.panel-header .badge {
+.panel-body { padding: 6px 0; max-height: clamp(380px, 25vw, 600px); overflow-y: auto; }
+.panel-body.live-feed-body { max-height: 340px; }
+.live-glyph {
+  color: var(--success);
+  text-shadow: 0 0 8px rgba(106, 232, 138, 0.55);
+  animation: live-glyph-pulse 1.5s ease-in-out infinite;
+}
+@keyframes live-glyph-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.15; }
+}
+.live-cap {
   font-family: var(--font-mono);
   font-size: 10px;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: var(--critical-bg);
-  color: var(--critical);
-  font-weight: 600;
-}
-.panel-body { padding: 6px 0; max-height: 380px; overflow-y: auto; }
-.panel-body.live-feed-body { max-height: 340px; }
-
-.urgent-item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 8px 10px;
-  padding: 8px 14px;
-  border-bottom: 1px solid rgba(31,45,66,0.5);
-  text-decoration: none;
-  color: inherit;
-  transition: background 0.1s;
-}
-.urgent-item:last-child { border-bottom: none; }
-.urgent-item:hover { background: var(--bg-elevated); }
-.urgent-item .u-sev {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 2px;
-  text-transform: uppercase;
-  align-self: start;
-  margin-top: 2px;
-}
-.urgent-item .u-sev.critical { background: var(--critical); color: #06141a; }
-.urgent-item .u-sev.error { background: var(--error); color: #06141a; }
-.urgent-item .u-body { overflow: hidden; }
-.urgent-item .u-title {
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.urgent-item .u-meta {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-weight: 400;
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0.02em;
   color: var(--text-muted);
-  display: flex;
-  gap: 8px;
-  margin-top: 1px;
+  margin-left: auto;
 }
 
 .live-item {
@@ -349,7 +315,7 @@ body::before {
   100% { background-color: transparent; }
 }
 .live-item:last-child { border-bottom: none; }
-.live-item:hover { background: var(--bg-elevated); }
+.live-item:hover { background: var(--bg-elevated) !important; }
 .live-item .l-sev {
   font-family: var(--font-mono);
   font-size: 8px;
@@ -450,19 +416,6 @@ body::before {
 }
 .msd-sm .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
 
-.panel-header-link {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--accent);
-  text-decoration: none;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  transition: color 0.15s;
-}
-.panel-header-link:hover { color: var(--text); }
-
 .node-summary-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -552,6 +505,68 @@ body::before {
   font-size: 24px;
 }
 
+/* ---------- KPI report cards ---------- */
+.kpi-card-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kpi-card-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.kpi-grade-badge {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 10px;
+  border-radius: 6px;
+}
+.kpi-grade-badge-a { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+.kpi-grade-badge-b { background: var(--success-bg); color: var(--accent); border: 1px solid var(--accent); }
+.kpi-grade-badge-c { background: var(--success-bg); color: var(--warning); border: 1px solid var(--warning); }
+.kpi-grade-badge-d { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical); }
+.kpi-grade-badge-f { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical); }
+.kpi-card-pct {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.kpi-card-scoreline {
+  text-align: center;
+}
+.kpi-card-bigscore {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+.kpi-card-total {
+  font-size: 15px;
+  color: var(--text-muted);
+}
+.kpi-card-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.kpi-card-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+.kpi-card-bar-fill-a { background: var(--success); }
+.kpi-card-bar-fill-b { background: var(--accent); }
+.kpi-card-bar-fill-c { background: var(--warning); }
+.kpi-card-bar-fill-d { background: var(--critical); }
+.kpi-card-bar-fill-f { background: var(--critical); }
+
 /* summary-grid / summary-stat (reused in ETS cards) */
 .summary-grid {
   display: flex;
@@ -604,18 +619,6 @@ body::before {
   color: var(--text-muted);
 }
 
-.urgent-time-btn {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 3px 8px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.urgent-time-btn:hover { border-color: var(--accent); }
-
 @media (max-width: 1100px) {
   .dashboard-layout { grid-template-columns: 1fr; }
   .side-panel { position: static; }
@@ -636,35 +639,39 @@ body::before {
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   background: #aab4c2;
 }
-[data-theme="light"] .login-card {
-  background: var(--bg-card);
-  border-color: var(--border);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-}
 {% endblock %}
 
 {% block content %}
-<div id="windowPanel" style="display:none;position:fixed;z-index:99999;min-width:160px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,0.5);flex-direction:column;">
+<div id="windowPanel" style="display:none;position:fixed;z-index:99999;min-width:360px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,0.5);flex-direction:column;">
   <a href="{% url 'dashboard' %}?window=all" class="msd-option" style="display:flex;align-items:center;gap:6px;padding:5px 12px;text-decoration:none;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);border-left:2px solid transparent;transition:background 0.08s;cursor:pointer;{% if time_window == 'all' %}background:var(--accent-dim);border-left-color:var(--accent);color:var(--text);{% endif %}">All Time</a>
   <a href="{% url 'dashboard' %}?window=12h" class="msd-option" style="display:flex;align-items:center;gap:6px;padding:5px 12px;text-decoration:none;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);border-left:2px solid transparent;transition:background 0.08s;cursor:pointer;{% if time_window == '12h' %}background:var(--accent-dim);border-left-color:var(--accent);color:var(--text);{% endif %}">Last 12h</a>
   <a href="{% url 'dashboard' %}?window=24h" class="msd-option" style="display:flex;align-items:center;gap:6px;padding:5px 12px;text-decoration:none;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);border-left:2px solid transparent;transition:background 0.08s;cursor:pointer;{% if time_window == '24h' %}background:var(--accent-dim);border-left-color:var(--accent);color:var(--text);{% endif %}">Last 24h</a>
+  <div style="border-top:1px solid var(--border);margin-top:6px;padding:8px 12px;">
+    <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:6px;">Custom Range</div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <input type="datetime-local" id="winFrom" value="{{ window_from }}" style="flex:1;min-width:0;background:var(--bg-inset);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 6px;font-family:var(--font-mono);font-size:11px;">
+      <span style="color:var(--text-muted);">→</span>
+      <input type="datetime-local" id="winTo" value="{{ window_to }}" style="flex:1;min-width:0;background:var(--bg-inset);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 6px;font-family:var(--font-mono);font-size:11px;">
+    </div>
+    <button type="button" id="applyCustomWindow" style="margin-top:8px;width:100%;font-family:var(--font-mono);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent);border-radius:var(--radius-sm);padding:6px 10px;cursor:pointer;">Apply</button>
+  </div>
 </div>
 <div class="dashboard-layout">
   <div class="main-area">
     <div class="severity-cards">
-      <a href="{% url 'monitor_alerts' %}?severity=CRITICAL" class="sev-card sev-critical">
+      <a href="{% url 'monitor_alerts' %}?severity=CRITICAL{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-critical">
         <span class="count">{{ severity_counts.CRITICAL }}</span>
         <span class="label">Critical</span>
       </a>
-      <a href="{% url 'monitor_alerts' %}?severity=ERROR" class="sev-card sev-error">
+      <a href="{% url 'monitor_alerts' %}?severity=ERROR{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-error">
         <span class="count">{{ severity_counts.ERROR }}</span>
         <span class="label">Error</span>
       </a>
-      <a href="{% url 'monitor_alerts' %}?severity=WARNING" class="sev-card sev-warning">
+      <a href="{% url 'monitor_alerts' %}?severity=WARNING{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-warning">
         <span class="count">{{ severity_counts.WARNING }}</span>
         <span class="label">Warning</span>
       </a>
-      <a href="{% url 'monitor_alerts' %}?severity=INFO" class="sev-card sev-info">
+      <a href="{% url 'monitor_alerts' %}?severity=INFO{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-info">
         <span class="count">{{ severity_counts.INFO }}</span>
         <span class="label">Info</span>
       </a>
@@ -718,7 +725,7 @@ body::before {
       <div id="ets-card-grid" style="padding:10px;display:flex;flex-wrap:nowrap;gap:10px;overflow-x:auto;">
         {% for e in ets_data %}
         {% if e.has_issue %}
-        <div class="ets-card ets-card-issue" data-has-issue="true" data-node="{{ e.node_id }}" onclick="window.location.href='{% url 'alert_detail' e.id %}'">
+        <div class="ets-card ets-card-issue" onclick="window.location.href='{% url 'alert_detail' e.id %}'">
           <div class="ets-card-header">
             <span class="ets-card-node">{{ e.node_id }}</span>
             <span class="ets-card-time">{{ e.event_time|date:'m/d H:i' }}</span>
@@ -739,12 +746,55 @@ body::before {
         {% endif %}
       </div>
     </div>
+
+    <!-- KPI Reports -->
+    <div class="node-summary-card">
+      <div class="node-summary-header">
+        <span>&#9776; KPI Reports</span>
+        <span class="ns-count" id="kpiBadge">{{ kpi_issue_count }}</span>
+      </div>
+      <div id="kpi-card-grid" style="padding:10px;display:flex;flex-wrap:nowrap;gap:10px;overflow-x:auto;">
+        {% for e in kpi_data %}
+        {% if e.has_issue %}
+        <div class="ets-card ets-card-issue" onclick="window.location.href='{% url 'alert_detail' e.id %}'">
+          <div class="ets-card-header">
+            <span class="ets-card-node">{{ e.node_id }}</span>
+            <span class="ets-card-time">{{ e.event_time|date:'m/d H:i' }}</span>
+          </div>
+          <div class="kpi-card-body">
+            <div class="kpi-card-line">
+              {% if e.grade %}
+              <span class="kpi-grade-badge kpi-grade-badge-{{ e.grade|lower }}">{{ e.grade }}</span>
+              {% endif %}
+              {% if e.percentage is not None %}
+              <span class="kpi-card-pct">{{ e.percentage|floatformat:1 }}%</span>
+              {% endif %}
+            </div>
+            {% if e.score is not None and e.total is not None %}
+            <div class="kpi-card-scoreline">
+              <span class="kpi-card-bigscore">{{ e.score }}<span class="kpi-card-total"> / {{ e.total }}</span></span>
+            </div>
+            {% endif %}
+            {% if e.percentage is not None %}
+            <div class="kpi-card-bar">
+              <div class="kpi-card-bar-fill {% if e.grade %}kpi-card-bar-fill-{{ e.grade|lower }}{% else %}kpi-card-bar-fill-f{% endif %}" style="width: {% widthratio e.percentage 100 100 %}%"></div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% if not kpi_has_issues %}
+        <div class="empty-panel" style="flex:1;min-width:200px;">No KPI Reports with Issues</div>
+        {% endif %}
+      </div>
+    </div>
   </div>
 
   <div class="side-panel">
     <div class="panel-card">
       <div class="panel-header">
-        &#9888; CRITICAL
+        <span class="live-glyph">&#9888;</span> CRITICAL <span class="live-cap">(last 20 alerts)</span>
       </div>
       <div class="panel-body live-feed-body" id="critical-feed">
         {% for a in critical_alerts %}
@@ -759,7 +809,7 @@ body::before {
     </div>
     <div class="panel-card">
       <div class="panel-header">
-        &#9632; Live Feed
+        <span class="live-glyph">&#9632;</span> Live Feed <span class="live-cap">(last 20 alerts)</span>
       </div>
       <div class="live-filters" id="live-filters">
         <div class="msd-group" data-name="severity">
@@ -980,15 +1030,11 @@ body::before {
   (function(){
     var btn = document.getElementById('windowToggleBtn');
     var panel = document.getElementById('windowPanel');
-    var textEl = document.getElementById('windowToggleText');
     if (!btn || !panel) return;
     function position() {
       var rect = btn.getBoundingClientRect();
       panel.style.left = rect.left + 'px';
       panel.style.top = (rect.bottom + 4) + 'px';
-    }
-    function hideAll() {
-      panel.style.display = 'none';
     }
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -1004,6 +1050,21 @@ body::before {
     document.addEventListener('click', function() {
       panel.style.display = 'none';
     });
+
+    var applyBtn = document.getElementById('applyCustomWindow');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var from = document.getElementById('winFrom').value;
+        var to = document.getElementById('winTo').value;
+        if (!from || !to) return;
+        var qs = new URLSearchParams();
+        qs.set('window', 'custom');
+        qs.set('from', from);
+        qs.set('to', to);
+        window.location.href = "{% url 'dashboard' %}?" + qs.toString();
+      });
+    }
   })();
 
   const liveFeed = document.getElementById('live-feed');
@@ -1114,10 +1175,10 @@ body::before {
 
   function escHtml(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
 
-  function createLiveItem(a, animate) {
+  function createLiveItem(a) {
     const el = document.createElement('a');
     el.href = '/alert/' + a.id + '/';
-    el.className = 'live-item sev-' + a.severity.toLowerCase() + (animate !== false ? ' new' : '');
+    el.className = 'live-item sev-' + a.severity.toLowerCase() + ' new';
     el.dataset.id = a.id;
     el.dataset.ingestedAt = a.ingested_at || '';
     el.dataset.severity = a.severity;
@@ -1156,14 +1217,18 @@ body::before {
     if (latest.ingested_at > maxIngestedAt) maxIngestedAt = latest.ingested_at;
     newAlerts.sort((a, b) => a.ingested_at.localeCompare(b.ingested_at));
     newAlerts.forEach(function(a) {
-      var item = createLiveItem(a, incrementCounts);
+      var item = createLiveItem(a);
       insertIntoSorted(item, liveFeed);
       item.style.display = matchesFilters(item) ? '' : 'none';
     });
-    while (liveFeed.children.length > 40) liveFeed.removeChild(liveFeed.lastChild);
+    while (liveFeed.children.length > 20) liveFeed.removeChild(liveFeed.lastChild);
 
     if (incrementCounts && sevCardData) {
       newAlerts.forEach(function(a) {
+        if (isCustomWindow) {
+          var t = Date.parse(a.event_time);
+          if (!(t >= customFromMs && t <= customToMs)) return;
+        }
         var sev = (a.severity || '').toLowerCase();
         var info = sevCardData[sev];
         if (info) {
@@ -1184,7 +1249,7 @@ body::before {
       if (newCritical.length > 0) {
         newCritical.sort(function(a, b) { return a.ingested_at.localeCompare(b.ingested_at); });
         newCritical.forEach(function(a) {
-          var item = createLiveItem(a, incrementCounts);
+          var item = createLiveItem(a);
           insertIntoSorted(item, criticalFeed);
         });
         while (criticalFeed.children.length > 20) criticalFeed.removeChild(criticalFeed.lastChild);
@@ -1220,6 +1285,9 @@ body::before {
   })();
 
   /* initialise severity card data for client-side increment */
+  var isCustomWindow = {% if time_window == 'custom' %}true{% else %}false{% endif %};
+  var customFromMs = Date.parse("{{ window_from|escapejs }}");
+  var customToMs = Date.parse("{{ window_to|escapejs }}");
   var sevCardData = {};
   document.querySelectorAll('.sev-card').forEach(function(card) {
     var labelEl = card.querySelector('.label');

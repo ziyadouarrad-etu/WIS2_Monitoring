@@ -1,4 +1,4 @@
-# WIS2 Global Telemetry Monitor
+# WIS2 Monitoring Events
 
 Real-time alert monitoring system for the **WMO Information System 2 (WIS2)** global infrastructure. Ingests WIS2 Notification Messages (WNMs) from the global MQTT broker, stores them in PostgreSQL, and streams them to a web dashboard via WebSockets.
 
@@ -191,9 +191,6 @@ DB_NAME=wis2_alerts
 DB_USER=wis2_admin
 DB_PASSWORD=<your-password>
 
-INGEST_DB_USER=ingestion_user
-INGEST_DB_PASSWORD=<your-password>
-
 MQTT_BROKER_HOST=globalbroker.meteo.fr
 MQTT_BROKER_PORT=443
 MQTT_TRANSPORT=websockets
@@ -208,7 +205,6 @@ MQTT_TOPIC=monitor/a/wis2/#
 ```sql
 CREATE DATABASE wis2_alerts;
 CREATE USER wis2_admin WITH PASSWORD '<password>';
-CREATE USER ingestion_user WITH PASSWORD '<password>';
 GRANT ALL PRIVILEGES ON DATABASE wis2_alerts TO wis2_admin;
 ```
 
@@ -238,18 +234,75 @@ python manage.py runserver
 
 The dashboard is available at `http://localhost:8000/`.
 
+## Alert retention (TTL)
+
+By default alerts are kept forever. You can enable a time-to-live from the Django admin panel:
+
+- Go to **Alert retention policy** in the admin.
+- Check **TTL active** to enable purging, then enter a number of days.
+- Uncheck **TTL active** to keep alerts forever (the day count is ignored while disabled).
+- An impact preview shows roughly how many alerts the current setting would purge.
+
+The cleanup runs via a management command:
+
+```bash
+# Preview what would be deleted (recommended first)
+python manage.py purge_alerts --dry-run
+
+# Actually purge
+python manage.py purge_alerts
+
+# One-off overrides
+python manage.py purge_alerts --days 30 --dry-run
+python manage.py purge_alerts --limit 5000
+```
+
+Purging deletes alerts whose `ingested_at` is older than the cutoff (in batches of 5000),
+along with their incident history (`incident_events`). User mute preferences are kept.
+Purging only runs when **TTL active** is checked in the admin; otherwise the command is a no-op.
+
+To schedule it nightly on the server, install a systemd timer (adjust the paths to your deploy):
+
+```ini
+# /etc/systemd/system/wis2-purge.service
+[Unit]
+Description=Purge expired WIS2 alerts
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/wis2_monitor
+ExecStart=/opt/wis2_monitor/.venv/bin/python manage.py purge_alerts
+```
+
+```ini
+# /etc/systemd/system/wis2-purge.timer
+[Unit]
+Description=Run WIS2 alert purge nightly
+[Timer]
+OnCalendar=*-*-* 03:00:00
+RandomizedDelaySec=30min
+Persistent=true
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now wis2-purge.timer
+```
+
 ## API Endpoints
 
 All endpoints require authentication (`@login_required`).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/` | Dashboard (severity counts, urgent alerts, ETS data, charts) |
+| GET | `/` | Dashboard (severity counts, ETS data, KPI data, charts) |
 | GET | `/monitor_alerts/` | Paginated alert list with filters |
 | GET | `/alert/<uuid>/` | Alert detail (tabs: Tests, Summary, WNM, Errors, Node History) |
 | GET | `/api/alerts/` | JSON alert feed (`?since=&offset=&limit=&severity=&node=&type=`) |
 | GET | `/api/alerts/per-day/` | Daily aggregated chart data (`?days=14&group_by=severity`) |
-| GET | `/api/alerts/filter-options/` | Available filter values for current user |
+| GET | `/api/alert-exists/<uuid>/` | Check if an alert exists for the current user |
+| GET | `/api/alert/<uuid>/history/` | Paginated node-history HTML fragment |
 | POST | `/alert/<uuid>/comment/` | Add incident comment |
 | POST | `/alert/<uuid>/note/` | Add timed note (`{"text": "...", "duration": 3600}`) |
 | POST | `/alert/<uuid>/mute/` | Mute incident (`{"duration": 7200}`) |
@@ -264,4 +317,3 @@ All endpoints require authentication (`@login_required`).
 - **Batch inserts with NOTIFY**: The ingestion daemon batches 250 records and sends a single `pg_notify` with the UUID list, keeping the listener lightweight (it only fetches full rows when notified).
 - **Incident hashing**: `SHA-256(title:node)` groups recurring alerts from the same node into a single incident timeline.
 - **Dead letter queue**: Failed batches are written to `dead_letter.jsonl` for manual recovery instead of being dropped.
-- **Separate DB users**: `wis2_admin` for Django/listener, `ingestion_user` for the ingestion daemon (principle of least privilege).

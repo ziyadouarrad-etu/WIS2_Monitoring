@@ -1,7 +1,5 @@
-import re
-import json
 from django.shortcuts import render
-from django.http import JsonResponse, FileResponse
+from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Q, Max, Count
 from django.db.models.functions import TruncDay
@@ -13,6 +11,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from datetime import timedelta
 from .models import Alert, Node, IncidentEvent, IncidentMute
+from .templatetags.monitor_extras import event_type_label
 
 
 def _is_admin(user):
@@ -42,7 +41,6 @@ def exclude_muted(qs, user):
 
 
 CACHE_TTL = 60
-FILTER_FIELDS = ['severity', 'node', 'type', 'alert', 'source']
 
 
 def parse_filter_params(request):
@@ -78,6 +76,21 @@ def apply_filters(qs, params):
     return qs
 
 
+def apply_window(qs, time_window, from_str='', to_str=''):
+    """Apply the dashboard time window; returns (filtered_qs, time_window)."""
+    if time_window == '12h':
+        return qs.filter(event_time__gte=timezone.now() - timedelta(hours=12)), '12h'
+    if time_window == '24h':
+        return qs.filter(event_time__gte=timezone.now() - timedelta(hours=24)), '24h'
+    if time_window == 'custom':
+        from_dt = parse_datetime(from_str) if from_str else None
+        to_dt = parse_datetime(to_str) if to_str else None
+        if from_dt is None or to_dt is None or from_dt > to_dt:
+            return qs, 'all'
+        return qs.filter(event_time__gte=from_str, event_time__lte=to_str), 'custom'
+    return qs, 'all'
+
+
 def get_cached_choices(cache_key, queryset, ttl=None):
     if ttl is None:
         ttl = CACHE_TTL
@@ -102,22 +115,11 @@ def get_node_choices(user):
     )
 
 
-def _user_queryset(user):
-    if _is_admin(user):
-        return Alert.objects.all()
-    profile = getattr(user, 'profile', None)
-    if profile is not None:
-        allowed_nodes = profile.allowed_nodes.all()
-        if allowed_nodes:
-            return Alert.objects.filter(node__in=allowed_nodes)
-    return Alert.objects.none()
-
-
 def get_type_choices(user):
     suffix = '' if _is_admin(user) else f'_{user.id}'
     return get_cached_choices(
         f'dashboard_type_choices{suffix}',
-        _user_queryset(user).filter(event_type__isnull=False).exclude(event_type='')
+        get_alerts_for_user(user).filter(event_type__isnull=False).exclude(event_type='')
         .values_list('event_type', flat=True).distinct().order_by('event_type')[:500],
     )
 
@@ -126,7 +128,7 @@ def get_source_choices(user):
     suffix = '' if _is_admin(user) else f'_{user.id}'
     return get_cached_choices(
         f'dashboard_source_choices{suffix}',
-        _user_queryset(user).filter(source__isnull=False).exclude(source='')
+        get_alerts_for_user(user).filter(source__isnull=False).exclude(source='')
         .values_list('source', flat=True).distinct().order_by('source'),
     )
 
@@ -135,7 +137,7 @@ def get_alert_choices(user):
     suffix = '' if _is_admin(user) else f'_{user.id}'
     return get_cached_choices(
         f'dashboard_alert_choices{suffix}',
-        _user_queryset(user).filter(display_title__isnull=False).exclude(display_title='')
+        get_alerts_for_user(user).filter(display_title__isnull=False).exclude(display_title='')
         .order_by('display_title').values_list('display_title', flat=True).distinct('display_title')[:500],
     )
 
@@ -145,60 +147,21 @@ def dashboard(request):
     qs = get_alerts_for_user(request.user)
 
     time_window = request.GET.get('window', 'all')
-    now_tz = timezone.now()
+    window_from = request.GET.get('from', '').strip()
+    window_to = request.GET.get('to', '').strip()
 
-    qs_cards = qs
-    if time_window == '12h':
-        since = now_tz - timedelta(hours=12)
-        qs_cards = qs.filter(event_time__gte=since)
-    elif time_window == '24h':
-        since = now_tz - timedelta(hours=24)
-        qs_cards = qs.filter(event_time__gte=since)
-    else:
-        time_window = 'all'
+    qs_cards, time_window = apply_window(qs, time_window, window_from, window_to)
+    if time_window != 'custom':
+        window_from = window_to = ''
 
     sev_counts_qs = qs_cards.values('severity').annotate(cnt=Count('id'))
     severity_counts = {s: 0 for s in ['CRITICAL', 'ERROR', 'WARNING', 'INFO']}
     for row in sev_counts_qs:
         severity_counts[row['severity']] = row['cnt']
 
-    urgent_hours = request.GET.get('urgent_hours', '24')
-    urgent_from = request.GET.get('urgent_from', '')
-    urgent_to = request.GET.get('urgent_to', '')
-    now_tz = timezone.now()
-    if urgent_hours == 'custom' and urgent_from and urgent_to:
-        try:
-            urgent_start = parse_datetime(urgent_from.replace('T', ' '))
-            urgent_end = parse_datetime(urgent_to.replace('T', ' '))
-        except Exception:
-            urgent_start = now_tz - timedelta(hours=24)
-            urgent_end = now_tz
-    else:
-        try:
-            hours = max(1, int(urgent_hours))
-        except (ValueError, TypeError):
-            hours = 24
-        urgent_start = now_tz - timedelta(hours=hours)
-        urgent_end = now_tz
-    urgent_alerts = qs.filter(
-        severity='CRITICAL',
-        event_time__gte=urgent_start,
-        event_time__lte=urgent_end
-    ).only('id', 'severity', 'title', 'event_type', 'node_id', 'event_time').order_by('-event_time')[:15]
-    urgent_from_display = urgent_from or urgent_start.strftime('%Y-%m-%dT%H:%M')
-    urgent_to_display = urgent_to or urgent_end.strftime('%Y-%m-%dT%H:%M')
-
     mini_alerts = qs.only('id', 'ingested_at', 'severity', 'node_id', 'title', 'display_title', 'event_type', 'event_time').order_by('-ingested_at')[:20]
 
     critical_alerts = qs.filter(severity='CRITICAL').only('id', 'ingested_at', 'severity', 'node_id', 'title', 'display_title', 'event_type', 'event_time').order_by('-ingested_at')[:20]
-
-    sev_order = ['CRITICAL', 'ERROR', 'WARNING', 'INFO']
-
-    # Event Type counts (show all types, 0 if none match)
-    all_types = list(qs.values_list('event_type', flat=True).distinct().order_by('event_type'))
-    type_counts_data = qs_cards.values('event_type').annotate(cnt=Count('id'))
-    type_count_map = {t['event_type']: t['cnt'] for t in type_counts_data}
-    type_display = [(t or 'Unknown', type_count_map.get(t, 0)) for t in all_types]
 
     # ETS Reports – latest per node ever that had an issue
     ets_rows = (
@@ -207,27 +170,60 @@ def dashboard(request):
         .distinct('node_id')
         .values('node_id', 'severity', 'title', 'id', 'event_time', 'summary', 'tests')
     )
-    ets_data = [{
-        'node_id': r['node_id'],
-        'severity': r['severity'],
-        'title': r['title'],
-        'id': str(r['id']),
-        'event_time': r['event_time'],
-        'summary': r['summary'] if isinstance(r['summary'], dict) else {},
-        'has_issue': False,
-    } for r in ets_rows]
-    for e in ets_data:
-        s = e['summary']
-        passed = s.get('PASSED', 0)
-        total = sum(v for v in s.values() if isinstance(v, (int, float)))
-        if isinstance(total, (int, float)) and isinstance(passed, (int, float)):
-            e['total'] = total
-            e['passed'] = passed
-            e['has_issue'] = total != passed
-        else:
-            e['total'] = 0
-            e['passed'] = 0
-            e['has_issue'] = True
+
+    def _is_kpi_summary(s):
+        return isinstance(s, dict) and any(k in s for k in ('grade', 'score', 'percentage'))
+
+    def _is_ets_summary(s):
+        return isinstance(s, dict) and any(k in s for k in ('PASSED', 'FAILED', 'SKIPPED', 'WARNING'))
+
+    ets_data = []
+    kpi_data = []
+    for r in ets_rows:
+        s = r['summary'] if isinstance(r['summary'], dict) else {}
+        if _is_kpi_summary(s):
+            score = s.get('score')
+            total = s.get('total')
+            kpi_data.append({
+                'node_id': r['node_id'],
+                'severity': r['severity'],
+                'title': r['title'],
+                'id': str(r['id']),
+                'event_time': r['event_time'],
+                'grade': s.get('grade'),
+                'score': score,
+                'total': total,
+                'percentage': s.get('percentage'),
+                'has_issue': isinstance(score, (int, float)) and isinstance(total, (int, float)) and score < total,
+            })
+        elif _is_ets_summary(s):
+            passed = s.get('PASSED', 0)
+            total = sum(v for v in s.values() if isinstance(v, (int, float)))
+            if isinstance(total, (int, float)) and isinstance(passed, (int, float)):
+                e = {
+                    'node_id': r['node_id'],
+                    'severity': r['severity'],
+                    'title': r['title'],
+                    'id': str(r['id']),
+                    'event_time': r['event_time'],
+                    'summary': s,
+                    'total': total,
+                    'passed': passed,
+                    'has_issue': total != passed,
+                }
+            else:
+                e = {
+                    'node_id': r['node_id'],
+                    'severity': r['severity'],
+                    'title': r['title'],
+                    'id': str(r['id']),
+                    'event_time': r['event_time'],
+                    'summary': s,
+                    'total': 0,
+                    'passed': 0,
+                    'has_issue': True,
+                }
+            ets_data.append(e)
 
     type_choices = get_type_choices(request.user)
     node_choices = get_node_choices(request.user)
@@ -235,27 +231,26 @@ def dashboard(request):
 
     return render(request, 'telemetry/dashboard.html', {
         'severity_counts': severity_counts,
-        'urgent_alerts': urgent_alerts,
         'mini_alerts': mini_alerts,
         'critical_alerts': critical_alerts,
 
         'type_choices': type_choices,
         'node_choices': node_choices,
         'source_choices': source_choices,
-        'urgent_hours': urgent_hours,
-        'urgent_from_display': urgent_from_display,
-        'urgent_to_display': urgent_to_display,
         'ets_data': ets_data,
         'ets_issue_count': sum(1 for e in ets_data if e['has_issue']),
         'ets_has_issues': any(e['has_issue'] for e in ets_data),
-        'type_display': type_display,
+        'kpi_data': kpi_data,
+        'kpi_issue_count': sum(1 for e in kpi_data if e['has_issue']),
+        'kpi_has_issues': any(e['has_issue'] for e in kpi_data),
         'time_window': time_window,
+        'window_from': window_from,
+        'window_to': window_to,
     })
 
 
 @login_required
 def monitor_alerts(request):
-    severities = ['CRITICAL', 'ERROR', 'WARNING', 'INFO']
     params = parse_filter_params(request)
     sort = params['sort']
 
@@ -300,49 +295,6 @@ def monitor_alerts(request):
         'current_time_to': params['time_to'],
         'current_sort': sort,
     })
-
-
-@login_required
-def api_alerts(request):
-    since = request.GET.get('since')
-    try:
-        offset = int(request.GET.get('offset', 0))
-        limit = int(request.GET.get('limit', 50))
-    except (TypeError, ValueError):
-        offset, limit = 0, 50
-    params = parse_filter_params(request)
-
-    qs = get_alerts_for_user(request.user)
-
-    if since:
-        since_dt = parse_datetime(since)
-        if since_dt is None:
-            since = re.sub(r' (\d{2}:\d{2})$', r'+\1', since)
-            since_dt = parse_datetime(since)
-        if since_dt is not None:
-            qs = qs.filter(ingested_at__gt=since_dt)
-    qs = apply_filters(qs, params)
-    qs = exclude_muted(qs, request.user)
-
-    qs = qs.only('id', 'event_type', 'severity', 'source', 'node_id', 'title', 'display_title', 'description', 'event_time', 'subtype', 'ingested_at').order_by(f'-{params["sort"]}')[offset:offset+limit]
-    data = [
-        {
-            'id': str(a.id),
-            'event_type': a.event_type,
-            'severity': a.severity,
-            'source': a.source,
-            'node': a.node_id,
-            'node_id': a.node_id,
-            'title': a.title,
-            'display_title': a.display_title,
-            'description': a.description,
-            'event_time': a.event_time.isoformat(),
-            'subtype': a.subtype,
-            'ingested_at': a.ingested_at.isoformat(),
-        }
-        for a in qs
-    ]
-    return JsonResponse({'alerts': data, 'count': len(data)})
 
 
 @login_required
@@ -640,6 +592,24 @@ def alert_detail(request, alert_id):
         elif isinstance(alert.tests, dict):
             tests_list = [alert.tests]
 
+    ets_tests = []
+    kpi_tests = []
+    for t in tests_list:
+        if isinstance(t, dict) and (
+            'score' in t or 'percentage' in t or '/kpi/' in str(t.get('id', ''))
+        ):
+            kpi_tests.append(t)
+        else:
+            ets_tests.append(t)
+
+    is_kpi_report = bool(kpi_tests)
+
+    kpi_overall = {}
+    if is_kpi_report and isinstance(alert.summary, dict):
+        for key in ('grade', 'score', 'total', 'percentage'):
+            if key in alert.summary:
+                kpi_overall[key] = alert.summary[key]
+
     summary_dict = alert.summary if isinstance(alert.summary, dict) else {}
 
     history_page_obj = None
@@ -681,22 +651,20 @@ def alert_detail(request, alert_id):
 
     return render(request, 'telemetry/detail.html', {
         'alert': alert,
-        'tests_list': tests_list,
+        'ets_tests': ets_tests,
+        'kpi_tests': kpi_tests,
+        'kpi_overall': kpi_overall,
+        'is_kpi_report': is_kpi_report,
         'summary_dict': summary_dict,
         'history_page_obj': history_page_obj,
         'history_count': history_count,
         'node_responsibles': node_responsibles,
+        'raw_json': alert.raw_json if isinstance(alert.raw_json, (dict, list)) else {},
     })
 
 
 SEV_COLORS = {'CRITICAL': '#FF4444', 'ERROR': '#FF8800', 'WARNING': '#FFD600', 'INFO': '#448AFF'}
 PALETTE = ['#4DD0C4', '#AB47BC', '#78909C', '#26A69A', '#EF5350', '#42A5F5', '#FFA726', '#66BB6A', '#EC407A', '#8D6E63']
-
-def _type_label(v):
-    if not v:
-        return ''
-    parts = v.split('.')
-    return ' '.join(parts[-2:]) if len(parts) >= 2 else v
 
 
 @login_required
@@ -750,7 +718,7 @@ def api_alerts_per_day(request):
         if not color:
             color = PALETTE[len(datasets) % len(PALETTE)]
         datasets.append({
-            'label': _type_label(g) if group_by == 'event_type' else g,
+            'label': event_type_label(g) if group_by == 'event_type' else g,
             'data': [day_map.get(d, {}).get(g, 0) for d in labels],
             'borderColor': color,
             'backgroundColor': color + '20',
@@ -759,15 +727,6 @@ def api_alerts_per_day(request):
         })
 
     return JsonResponse({'labels': labels, 'datasets': datasets})
-
-
-import os
-from django.conf import settings
-
-
-def logo_image(request):
-    path = os.path.join(settings.BASE_DIR, 'telemetry', 'static', 'telemetry', 'img.png')
-    return FileResponse(open(path, 'rb'), content_type='image/png')
 
 
 @login_required

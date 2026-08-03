@@ -1,7 +1,14 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Profile, NodeResponsible, NodeResponsibleMapping, Node
+from django import forms
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from datetime import timedelta
+from .models import (
+    Profile, NodeResponsible, NodeResponsibleMapping, Node,
+    AlertRetentionPolicy, Alert,
+)
 
 
 class ProfileInline(admin.StackedInline):
@@ -59,3 +66,39 @@ class NodeResponsibleAdmin(admin.ModelAdmin):
         mappings = obj.noderesponsiblemapping_set.all()
         return ", ".join(m.node.name for m in mappings)
     assigned_nodes.short_description = 'Assigned Nodes'
+
+
+class AlertRetentionPolicyForm(forms.ModelForm):
+    class Meta:
+        model = AlertRetentionPolicy
+        fields = ('ttl_active', 'retention_days')
+
+    def clean(self):
+        data = super().clean()
+        if data.get('ttl_active') and not data.get('retention_days'):
+            raise ValidationError({'retention_days': 'Set a number of days when TTL is active.'})
+        return data
+
+
+@admin.register(AlertRetentionPolicy)
+class AlertRetentionPolicyAdmin(admin.ModelAdmin):
+    form = AlertRetentionPolicyForm
+    list_display = ('ttl_active', 'retention_days', 'impact_preview', 'updated_at')
+    fields = ('ttl_active', 'retention_days', 'impact_preview', 'updated_at')
+    readonly_fields = ('impact_preview', 'updated_at')
+
+    def has_add_permission(self, request):
+        return not AlertRetentionPolicy.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def impact_preview(self, obj):
+        if not obj or not obj.ttl_active:
+            return 'TTL disabled: alerts are kept forever'
+        if not obj.retention_days:
+            return 'TTL active but no retention days set'
+        cutoff = timezone.now() - timedelta(days=obj.retention_days)
+        count = Alert.objects.filter(ingested_at__lt=cutoff).count()
+        return f"Would purge ~{count:,} alert(s) older than {obj.retention_days} days (ingested before {cutoff:%Y-%m-%d %H:%M})"
+    impact_preview.short_description = 'Impact preview'

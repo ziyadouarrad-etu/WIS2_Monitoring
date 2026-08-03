@@ -2,6 +2,8 @@ from django.db import models
 from django.db.models.signals import post_save, m2m_changed
 from django.dispatch import receiver
 from django.contrib.auth.models import User, Group
+from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 
 
 class Node(models.Model):
@@ -82,6 +84,7 @@ class Alert(models.Model):
     links = models.JSONField(null=True, blank=True)
     ingested_at = models.DateTimeField(auto_now_add=True)
     incident_hash = models.TextField(null=True, blank=True, db_index=True)
+    raw_json = models.JSONField(null=True, blank=True)
 
     class Meta:
         managed = False
@@ -167,3 +170,46 @@ class IncidentMute(models.Model):
 
     def __str__(self):
         return f"{self.incident_hash} muted by {self.user.username} until {self.muted_until}"
+
+
+class AlertRetentionPolicy(models.Model):
+    ttl_active = models.BooleanField(
+        default=False,
+        help_text="Enable the alert TTL. When disabled, alerts are kept forever.",
+    )
+    retention_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text="Delete alerts older than this many days. Required when TTL is active.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'alert_retention_policy'
+        verbose_name = 'alert retention policy'
+        verbose_name_plural = 'alert retention policy'
+
+    def clean(self):
+        if self.ttl_active and not self.retention_days:
+            raise ValidationError(
+                {'retention_days': 'Set a number of days when TTL is active.'}
+            )
+
+    def __str__(self):
+        if self.ttl_active and self.retention_days:
+            return f"TTL active: delete alerts older than {self.retention_days} days"
+        return "TTL disabled: alerts are kept forever"
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+def get_retention_days():
+    """Return the configured alert TTL in days, or None when TTL is off (persistence)."""
+    obj = AlertRetentionPolicy.objects.first()
+    if obj is None or not obj.ttl_active or not obj.retention_days:
+        return None
+    return obj.retention_days

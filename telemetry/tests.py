@@ -1,11 +1,13 @@
 import hashlib
+import io
 import json
 import uuid
 from unittest.mock import patch, MagicMock
 
 from django.test import SimpleTestCase, RequestFactory
+from django.core.management import call_command
 
-from telemetry.views import _is_admin, get_alerts_for_user
+from telemetry.views import _is_admin, get_alerts_for_user, apply_window
 from wis2_ingestion import _compute_display_title, parse_wmem_record
 
 
@@ -63,36 +65,6 @@ class IntParamHandlingTest(SimpleTestCase):
 
     @patch('telemetry.views.exclude_muted')
     @patch('telemetry.views.get_alerts_for_user')
-    def test_api_alerts_bad_offset(self, mock_get_alerts, mock_exclude):
-        mock_qs = MagicMock()
-        mock_qs.filter.return_value = mock_qs
-        mock_qs.only.return_value = mock_qs
-        mock_qs.order_by.return_value = mock_qs
-        mock_exclude.return_value = mock_qs
-        mock_get_alerts.return_value = mock_qs
-        from telemetry.views import api_alerts
-        request = self.factory.get('/api/alerts/', {'offset': 'abc', 'limit': 'xyz'})
-        request.user = self.user
-        response = api_alerts(request)
-        self.assertEqual(response.status_code, 200)
-
-    @patch('telemetry.views.exclude_muted')
-    @patch('telemetry.views.get_alerts_for_user')
-    def test_api_alerts_bad_limit(self, mock_get_alerts, mock_exclude):
-        mock_qs = MagicMock()
-        mock_qs.filter.return_value = mock_qs
-        mock_qs.only.return_value = mock_qs
-        mock_qs.order_by.return_value = mock_qs
-        mock_exclude.return_value = mock_qs
-        mock_get_alerts.return_value = mock_qs
-        from telemetry.views import api_alerts
-        request = self.factory.get('/api/alerts/', {'limit': 'notanumber'})
-        request.user = self.user
-        response = api_alerts(request)
-        self.assertEqual(response.status_code, 200)
-
-    @patch('telemetry.views.exclude_muted')
-    @patch('telemetry.views.get_alerts_for_user')
     def test_api_alerts_per_day_bad_days(self, mock_get_alerts, mock_exclude):
         mock_qs = MagicMock()
         mock_qs.filter.return_value = mock_qs
@@ -105,21 +77,6 @@ class IntParamHandlingTest(SimpleTestCase):
         request = self.factory.get('/api/alerts/per-day/', {'days': 'abc'})
         request.user = self.user
         response = api_alerts_per_day(request)
-        self.assertEqual(response.status_code, 200)
-
-    @patch('telemetry.views.exclude_muted')
-    @patch('telemetry.views.get_alerts_for_user')
-    def test_api_alerts_valid_params(self, mock_get_alerts, mock_exclude):
-        mock_qs = MagicMock()
-        mock_qs.filter.return_value = mock_qs
-        mock_qs.only.return_value = mock_qs
-        mock_qs.order_by.return_value = mock_qs
-        mock_exclude.return_value = mock_qs
-        mock_get_alerts.return_value = mock_qs
-        from telemetry.views import api_alerts
-        request = self.factory.get('/api/alerts/', {'offset': '0', 'limit': '10'})
-        request.user = self.user
-        response = api_alerts(request)
         self.assertEqual(response.status_code, 200)
 
     @patch('telemetry.views.exclude_muted')
@@ -137,6 +94,59 @@ class IntParamHandlingTest(SimpleTestCase):
         request.user = self.user
         response = api_alerts_per_day(request)
         self.assertEqual(response.status_code, 200)
+
+
+class ApplyWindowTest(SimpleTestCase):
+    def test_all_returns_qs_unchanged(self):
+        qs = MagicMock()
+        new_qs, window = apply_window(qs, 'all', '', '')
+        self.assertIs(new_qs, qs)
+        self.assertEqual(window, 'all')
+
+    def test_unknown_window_falls_back_to_all(self):
+        qs = MagicMock()
+        new_qs, window = apply_window(qs, 'bogus')
+        self.assertIs(new_qs, qs)
+        self.assertEqual(window, 'all')
+
+    def test_12h_filters(self):
+        qs = MagicMock()
+        apply_window(qs, '12h')
+        qs.filter.assert_called_once()
+        self.assertIn('event_time__gte', qs.filter.call_args.kwargs)
+
+    def test_24h_filters(self):
+        qs = MagicMock()
+        apply_window(qs, '24h')
+        qs.filter.assert_called_once()
+        self.assertIn('event_time__gte', qs.filter.call_args.kwargs)
+
+    def test_custom_valid_filters_both_bounds(self):
+        qs = MagicMock()
+        new_qs, window = apply_window(qs, 'custom', '2026-08-01T00:00', '2026-08-02T23:59')
+        qs.filter.assert_called_once_with(
+            event_time__gte='2026-08-01T00:00',
+            event_time__lte='2026-08-02T23:59',
+        )
+        self.assertEqual(window, 'custom')
+
+    def test_custom_missing_bound_falls_back_to_all(self):
+        qs = MagicMock()
+        new_qs, window = apply_window(qs, 'custom', '', '2026-08-02T23:59')
+        self.assertIs(new_qs, qs)
+        self.assertEqual(window, 'all')
+
+    def test_custom_invalid_falls_back_to_all(self):
+        qs = MagicMock()
+        new_qs, window = apply_window(qs, 'custom', 'not-a-date', '2026-08-02T23:59')
+        self.assertIs(new_qs, qs)
+        self.assertEqual(window, 'all')
+
+    def test_custom_reversed_falls_back_to_all(self):
+        qs = MagicMock()
+        new_qs, window = apply_window(qs, 'custom', '2026-08-02T00:00', '2026-08-01T00:00')
+        self.assertIs(new_qs, qs)
+        self.assertEqual(window, 'all')
 
 
 class AlertExistsTest(SimpleTestCase):
@@ -314,3 +324,118 @@ class ParseWmemRecordTest(SimpleTestCase):
     def test_malformed_returns_none(self):
         result = parse_wmem_record({'id': 123, 'data': 'not a dict'})
         self.assertIsNone(result)
+
+
+class PurgeAlertsCommandTest(SimpleTestCase):
+    def _configure_batches(self, mock_alert, batches):
+        mock_filter = mock_alert.objects.filter.return_value
+        mock_filter.values_list.return_value.__getitem__.side_effect = batches
+        return mock_filter
+
+    @patch('telemetry.management.commands.purge_alerts.Alert')
+    @patch('telemetry.management.commands.purge_alerts.IncidentEvent')
+    @patch('telemetry.management.commands.purge_alerts.get_retention_days')
+    def test_persistence_mode_does_nothing(self, mock_days, mock_incident, mock_alert):
+        mock_days.return_value = None
+        out = io.StringIO()
+        call_command('purge_alerts', stdout=out)
+        self.assertIn('Persistence mode', out.getvalue())
+        mock_alert.objects.filter.assert_not_called()
+        mock_incident.objects.filter.assert_not_called()
+
+    @patch('telemetry.management.commands.purge_alerts.Alert')
+    @patch('telemetry.management.commands.purge_alerts.IncidentEvent')
+    @patch('telemetry.management.commands.purge_alerts.transaction')
+    @patch('telemetry.management.commands.purge_alerts.get_retention_days')
+    def test_purges_in_batches_and_cascades_history(self, mock_days, mock_txn, mock_incident, mock_alert):
+        mock_days.return_value = 30
+        batch1 = [str(uuid.uuid4()) for _ in range(5000)]
+        batch2 = [str(uuid.uuid4())]
+        mock_filter = self._configure_batches(mock_alert, [batch1, batch2, []])
+        mock_incident.objects.filter.return_value.delete.return_value = (1, {})
+        mock_filter.delete.side_effect = [(3, {}), (1, {})]
+
+        out = io.StringIO()
+        call_command('purge_alerts', stdout=out)
+
+        self.assertEqual(mock_incident.objects.filter.call_count, 2)
+        self.assertEqual(mock_filter.delete.call_count, 2)
+        self.assertIn('Done: 4 alert(s) purged.', out.getvalue())
+
+    @patch('telemetry.management.commands.purge_alerts.Alert')
+    @patch('telemetry.management.commands.purge_alerts.IncidentEvent')
+    @patch('telemetry.management.commands.purge_alerts.get_retention_days')
+    def test_dry_run_deletes_nothing(self, mock_days, mock_incident, mock_alert):
+        mock_days.return_value = 30
+        mock_filter = mock_alert.objects.filter.return_value
+        mock_filter.count.return_value = 10
+
+        out = io.StringIO()
+        call_command('purge_alerts', stdout=out, dry_run=True)
+
+        self.assertIn('would purge 10 alert(s) (dry-run)', out.getvalue())
+        self.assertIn('would be purged (dry-run)', out.getvalue())
+        mock_filter.values_list.assert_not_called()
+        mock_incident.objects.filter.assert_not_called()
+
+    @patch('telemetry.management.commands.purge_alerts.Alert')
+    @patch('telemetry.management.commands.purge_alerts.IncidentEvent')
+    @patch('telemetry.management.commands.purge_alerts.transaction')
+    @patch('telemetry.management.commands.purge_alerts.get_retention_days')
+    def test_days_override_respected(self, mock_days, mock_txn, mock_incident, mock_alert):
+        mock_days.return_value = None
+        batch = [str(uuid.uuid4())]
+        mock_filter = self._configure_batches(mock_alert, [batch, []])
+        mock_filter.delete.side_effect = [(1, {})]
+
+        out = io.StringIO()
+        call_command('purge_alerts', stdout=out, days=30)
+
+        self.assertIn('purging alerts ingested before', out.getvalue())
+        self.assertIn('Done: 1 alert(s) purged.', out.getvalue())
+
+    def test_get_retention_days_returns_none_without_policy(self):
+        from telemetry.models import get_retention_days
+        with patch('telemetry.models.AlertRetentionPolicy.objects', new=MagicMock()) as mock_objects:
+            mock_objects.first.return_value = None
+            self.assertIsNone(get_retention_days())
+
+    def test_get_retention_days_inactive_ignores_days(self):
+        from telemetry.models import get_retention_days
+        with patch('telemetry.models.AlertRetentionPolicy.objects', new=MagicMock()) as mock_objects:
+            obj = MagicMock()
+            obj.ttl_active = False
+            obj.retention_days = 30
+            mock_objects.first.return_value = obj
+            self.assertIsNone(get_retention_days())
+
+    def test_get_retention_days_active_with_days(self):
+        from telemetry.models import get_retention_days
+        with patch('telemetry.models.AlertRetentionPolicy.objects', new=MagicMock()) as mock_objects:
+            obj = MagicMock()
+            obj.ttl_active = True
+            obj.retention_days = 30
+            mock_objects.first.return_value = obj
+            self.assertEqual(get_retention_days(), 30)
+
+    def test_get_retention_days_active_without_days(self):
+        from telemetry.models import get_retention_days
+        with patch('telemetry.models.AlertRetentionPolicy.objects', new=MagicMock()) as mock_objects:
+            obj = MagicMock()
+            obj.ttl_active = True
+            obj.retention_days = None
+            mock_objects.first.return_value = obj
+            self.assertIsNone(get_retention_days())
+
+    def test_clean_requires_days_when_active(self):
+        from django.core.exceptions import ValidationError
+        from telemetry.models import AlertRetentionPolicy
+        policy = AlertRetentionPolicy(ttl_active=True, retention_days=None)
+        with self.assertRaises(ValidationError):
+            policy.clean()
+
+    def test_clean_allows_active_with_days_and_inactive_without(self):
+        from telemetry.models import AlertRetentionPolicy
+        AlertRetentionPolicy(ttl_active=True, retention_days=30).clean()
+        AlertRetentionPolicy(ttl_active=False, retention_days=None).clean()
+        AlertRetentionPolicy(ttl_active=False, retention_days=30).clean()
