@@ -777,6 +777,9 @@ body::after {
 .kpi-overall-total { color: var(--text-muted); font-size: 18px; }
 .kpi-overall-stat-good { border-top-color: var(--success); }
 .kpi-overall-stat-critical { border-top-color: var(--critical); }
+.kpi-overall-stat-error { border-top-color: var(--error); }
+.kpi-overall-stat-warning { border-top-color: var(--warning); }
+.kpi-overall-stat-info { border-top-color: var(--info); }
 .kpi-overall-label {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -812,6 +815,7 @@ body::after {
 .kpi-card-level-2 { border-left-color: #dbb93e; }
 .kpi-card-level-3 { border-left-color: #8cd4cf; }
 .kpi-card-level-4 { border-left-color: #4aba83; }
+.kpi-card-skipped { border-left-color: var(--skipped); }
 .kpi-card-header {
   display: flex;
   justify-content: space-between;
@@ -1916,24 +1920,26 @@ body::after {
             <span class="kpi-grade-label">Grade</span>
           </div>
           {% endif %}
+          {% with overall_lvl=kpi_overall|score_level %}
           {% if kpi_overall.score is not None and kpi_overall.total is not None %}
-          <div class="kpi-overall-stat">
+          <div class="kpi-overall-stat {% if overall_lvl == 4 %}kpi-overall-stat-good{% elif overall_lvl == 3 %}kpi-overall-stat-info{% elif overall_lvl == 2 %}kpi-overall-stat-warning{% elif overall_lvl == 1 %}kpi-overall-stat-error{% else %}kpi-overall-stat-critical{% endif %}">
             <div class="kpi-overall-value">{{ kpi_overall.score }}<span class="kpi-overall-total"> / {{ kpi_overall.total }}</span></div>
             <div class="kpi-overall-label">Score</div>
           </div>
           {% endif %}
           {% if kpi_overall.percentage is not None %}
-          <div class="kpi-overall-stat {% if kpi_overall.percentage == 100 %}kpi-overall-stat-good{% else %}kpi-overall-stat-critical{% endif %}">
+          <div class="kpi-overall-stat {% if overall_lvl == 4 %}kpi-overall-stat-good{% elif overall_lvl == 3 %}kpi-overall-stat-info{% elif overall_lvl == 2 %}kpi-overall-stat-warning{% elif overall_lvl == 1 %}kpi-overall-stat-error{% else %}kpi-overall-stat-critical{% endif %}">
             <div class="kpi-overall-value">{{ kpi_overall.percentage|floatformat:1 }}<span class="kpi-overall-total">%</span></div>
             <div class="kpi-overall-label">Percentage</div>
           </div>
           {% endif %}
+          {% endwith %}
         </div>
         {% endif %}
         <div class="kpi-grid">
           {% for k in kpi_tests %}
           {% with lvl=k|score_level %}
-          <div class="kpi-card {% if lvl is None %}kpi-card-info{% else %}kpi-card-level-{{ lvl }}{% endif %}">
+          <div class="kpi-card {% if lvl is None and k.total == 0 %}kpi-card-skipped{% elif lvl is None %}kpi-card-info{% else %}kpi-card-level-{{ lvl }}{% endif %}">
             <div class="kpi-card-header">
               <div class="kpi-card-title">{{ k.title|default:k.id }}</div>
               {% if k.score is not None and k.total is not None %}

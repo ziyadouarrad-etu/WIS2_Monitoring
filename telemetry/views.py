@@ -667,7 +667,6 @@ def alert_detail(request, alert_id):
     if alert.node_id:
         history_qs = user_qs.filter(
             node=alert.node_id,
-            event_time__gte=timezone.now() - timedelta(days=30),
         ).exclude(id=alert.id).order_by('-event_time')
         history_paginator = Paginator(history_qs, 6)
         history_count = history_paginator.count
@@ -853,7 +852,6 @@ def alert_history_fragment(request, alert_id):
     if alert.node_id:
         history_qs = user_qs.filter(
             node=alert.node_id,
-            event_time__gte=timezone.now() - timedelta(days=30),
         ).exclude(id=alert.id).order_by('-event_time')
         history_paginator = Paginator(history_qs, 6)
         history_count = history_paginator.count
