@@ -14,6 +14,36 @@ def event_type_label(value):
     return ' '.join(parts[-2:]) if len(parts) >= 2 else value
 
 
+@register.filter
+def score_level(k):
+    """Map a KPI test to a 0-4 color bucket based on its percentage score.
+    0 = red (0-25%), 1 = orange (25-50%), 2 = yellow (50-75%),
+    3 = light green (75-<100%), 4 = green (100%). Returns None for no score."""
+    if not isinstance(k, dict):
+        return None
+    p = k.get('percentage')
+    if p is None and k.get('score') is not None and k.get('total'):
+        try:
+            p = (k['score'] / k['total']) * 100
+        except (TypeError, ZeroDivisionError, ValueError):
+            p = None
+    if p is None:
+        return None
+    try:
+        p = float(p)
+    except (TypeError, ValueError):
+        return None
+    if p >= 100:
+        return 4
+    if p >= 75:
+        return 3
+    if p >= 50:
+        return 2
+    if p >= 25:
+        return 1
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # WNM (WIS2 Notification Message) rendering
 #

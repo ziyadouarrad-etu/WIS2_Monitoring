@@ -806,6 +806,12 @@ body::after {
 }
 .kpi-card-good { border-left-color: var(--success); }
 .kpi-card-critical { border-left-color: var(--critical); }
+.kpi-card-info { border-left-color: var(--info); }
+.kpi-card-level-0 { border-left-color: #e55858; }
+.kpi-card-level-1 { border-left-color: #e8994a; }
+.kpi-card-level-2 { border-left-color: #dbb93e; }
+.kpi-card-level-3 { border-left-color: #8cd4cf; }
+.kpi-card-level-4 { border-left-color: #4aba83; }
 .kpi-card-header {
   display: flex;
   justify-content: space-between;
@@ -843,6 +849,12 @@ body::after {
 }
 .kpi-bar-good { background: var(--success); }
 .kpi-bar-critical { background: var(--critical); }
+.kpi-bar-info { background: var(--info); }
+.kpi-bar-level-0 { background: #e55858; }
+.kpi-bar-level-1 { background: #e8994a; }
+.kpi-bar-level-2 { background: #dbb93e; }
+.kpi-bar-level-3 { background: #8cd4cf; }
+.kpi-bar-level-4 { background: #4aba83; }
 .kpi-bar-meta {
   display: flex;
   align-items: center;
@@ -1920,7 +1932,8 @@ body::after {
         {% endif %}
         <div class="kpi-grid">
           {% for k in kpi_tests %}
-          <div class="kpi-card {% if k.percentage is not None and k.percentage != 100 %}kpi-card-critical{% else %}kpi-card-good{% endif %}">
+          {% with lvl=k|score_level %}
+          <div class="kpi-card {% if lvl is None %}kpi-card-info{% else %}kpi-card-level-{{ lvl }}{% endif %}">
             <div class="kpi-card-header">
               <div class="kpi-card-title">{{ k.title|default:k.id }}</div>
               {% if k.score is not None and k.total is not None %}
@@ -1929,7 +1942,7 @@ body::after {
             </div>
             {% if k.percentage is not None %}
             <div class="kpi-bar">
-              <div class="kpi-bar-fill {% if k.percentage == 100 %}kpi-bar-good{% else %}kpi-bar-critical{% endif %}" style="width: {% widthratio k.percentage 100 100 %}%"></div>
+              <div class="kpi-bar-fill {% if lvl is None %}kpi-bar-info{% else %}kpi-bar-level-{{ lvl }}{% endif %}" style="width: {% widthratio k.percentage 100 100 %}%"></div>
             </div>
             <div class="kpi-bar-meta">
               <span class="kpi-bar-pct">{{ k.percentage|floatformat:1 }}%</span>
@@ -1951,6 +1964,7 @@ body::after {
             <div class="kpi-card-id" title="{{ k.id }}">{{ k.id }}</div>
             {% endif %}
           </div>
+          {% endwith %}
           {% endfor %}
         </div>
       </div>
