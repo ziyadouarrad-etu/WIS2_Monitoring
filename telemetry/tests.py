@@ -418,6 +418,18 @@ class ComputeDisplayTitleTest(SimpleTestCase):
     def test_http_403(self):
         self.assertEqual(_compute_display_title('t', 'HTTP status 403'), 'HTTP Error: 403 Forbidden')
 
+    def test_http_404(self):
+        self.assertEqual(_compute_display_title('gc.wis.cma.cn', 'HTTP status 404 Not Found'), 'HTTP Error: 404 Not Found')
+
+    def test_http_503(self):
+        self.assertEqual(_compute_display_title('t', 'HTTP status 503'), 'HTTP Error: 503 Service Unavailable')
+
+    def test_http_unknown_code(self):
+        self.assertEqual(_compute_display_title('t', 'HTTP status 999'), 'HTTP Error: 999')
+
+    def test_network_unreachable(self):
+        self.assertEqual(_compute_display_title('wis2.ncm.gov.sa', 'connect: network is unreachable'), 'Network Error: network is unreachable')
+
     def test_invalid_response(self):
         self.assertEqual(_compute_display_title('t', 'expected a valid start token'), 'Invalid Response')
 

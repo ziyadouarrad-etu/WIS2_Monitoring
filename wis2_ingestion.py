@@ -143,10 +143,18 @@ def _compute_display_title(title, description):
         return 'Network Termination: client connection lost'
     if 'connection refused' in d:
         return 'Connection Refused'
-    if 'HTTP status 502' in d:
-        return 'HTTP Error: 502 Bad Gateway'
-    if 'HTTP status 403' in d:
-        return 'HTTP Error: 403 Forbidden'
+    if 'network is unreachable' in d:
+        return 'Network Error: network is unreachable'
+    http_match = re.search(r'HTTP status (\d{3})', d)
+    if http_match:
+        code = http_match.group(1)
+        reason = {
+            '400': 'Bad Request', '401': 'Unauthorized', '403': 'Forbidden',
+            '404': 'Not Found', '500': 'Internal Server Error',
+            '502': 'Bad Gateway', '503': 'Service Unavailable',
+            '504': 'Gateway Timeout',
+        }.get(code, '')
+        return f'HTTP Error: {code}{" " + reason if reason else ""}'
     if 'expected a valid start token' in d:
         return 'Invalid Response'
     if 'connection reset by peer' in d:
