@@ -5,3 +5,4 @@ __pycache__/
 staticfiles/
 logs/*.log
 *.sql
+client_secret.json

@@ -1,3 +1,4 @@
+import logging
 import uuid
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -19,6 +20,9 @@ from .jira import (
     is_configured as jira_is_configured,
     create_jira_ticket as jira_create_ticket,
 )
+from .email_sender import send_email
+
+logger = logging.getLogger("WIS2_Email")
 
 def _is_admin(user):
     if not hasattr(user, '_is_admin_cached'):
@@ -568,7 +572,6 @@ def incident_activity(request, alert_id):
 @login_required
 def email_responsible(request, alert_id):
     from django.shortcuts import get_object_or_404
-    from django.core.mail import send_mail
     from django.http import JsonResponse
     from .models import NodeResponsible
     import json
@@ -594,30 +597,30 @@ def email_responsible(request, alert_id):
     note = (data.get('note') or '').strip()
     sent_names = []
     for responsible in responsibles:
-        lines = []
-        lines.append(f"NODE: {alert.node_id}")
-        lines.append(f"RESPONSIBLE: {responsible.name} <{responsible.email}>")
-        lines.append(f"TITLE: {alert.title or ''}")
-        lines.append(f"TIME: {alert.event_time.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.event_time else ''}")
-        if alert.description:
-            lines.append(f"DESCRIPTION: {alert.description}")
-        if alert.errors:
-            lines.append(f"ERRORS: {json.dumps(alert.errors, indent=2)}")
-        if alert.tests:
-            lines.append(f"TESTS: {json.dumps(alert.tests, indent=2)}")
-        if alert.summary:
-            lines.append(f"SUMMARY: {json.dumps(alert.summary, indent=2)}")
-        lines.append("")
-        lines.append(f"AGENT NAME: {request.user.get_full_name() or request.user.username}")
-        lines.append(f"INGESTION TIME: {alert.ingested_at.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.ingested_at else ''}")
-        lines.append(f"AGENT NOTE: {note}")
-        send_mail(
-            subject=f"[WIS2 Alert] {alert.node_id} - {alert.title or alert.event_type}",
-            message="\n".join(lines),
-            from_email=None,
-            recipient_list=[responsible.email],
-            fail_silently=False,
-        )
+        display_title = (alert.display_title or '').strip()
+        title = (alert.title or '').strip()
+        if display_title and title and display_title != title:
+            combined_title = f"{display_title} | {title}"
+        else:
+            combined_title = display_title or title
+        lines = [
+            f"NODE: {alert.node_id}",
+            f"TITLE: {combined_title}",
+            f"DESCRIPTION: {alert.description or ''}",
+            f"EVENT_TIME: {alert.event_time.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.event_time else ''}",
+            f"INGESTED_AT: {alert.ingested_at.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.ingested_at else ''}",
+            f"AGENT NAME: {request.user.get_full_name() or request.user.username}",
+            f"AGENT NOTE: {note}",
+        ]
+        try:
+            send_email(
+                subject=f"[WIS2 Alert] {alert.node_id} - {alert.title or alert.event_type}",
+                body="\n".join(lines),
+                to_email=responsible.email,
+            )
+        except Exception as exc:
+            logger.exception("Email to %s failed", responsible.email)
+            return JsonResponse({'error': f'Email failed: {exc}'}, status=502)
         sent_names.append(f"{responsible.name} <{responsible.email}>")
     if alert.incident_hash:
         email_text = f"Email sent to {', '.join(sent_names)}"

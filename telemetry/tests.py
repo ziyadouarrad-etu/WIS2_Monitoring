@@ -18,6 +18,8 @@ from telemetry.purge_scheduler import next_purge_target, sleep_until, run_purge
 from telemetry.context_processors import admin_panel
 from telemetry.jira import build_summary as jira_build_summary
 from telemetry.jira import create_jira_ticket as jira_create_ticket_api
+from telemetry import email_sender as email_sender_mod
+from telemetry.email_sender import send_email as email_sender_send
 from wis2_ingestion import _compute_display_title, parse_wmem_record
 
 
@@ -907,4 +909,191 @@ class CreateJiraTicketViewTest(SimpleTestCase):
         req = self.factory.get('/alert/x/jira/')
         req.user = self.user
         resp = create_jira_ticket(req, self.UUID)
+        self.assertEqual(resp.status_code, 405)
+
+
+class EmailSenderTest(SimpleTestCase):
+    def _gmail_env(self):
+        return {
+            'GMAIL_CLIENT_ID': 'client-id',
+            'GMAIL_CLIENT_SECRET': 'client-secret',
+            'GMAIL_REFRESH_TOKEN': 'refresh-token',
+            'SMTP_USER': 'sender@gmail.com',
+        }
+
+    def test_not_configured_without_env(self):
+        with patch.dict(os.environ, {}, clear=False):
+            for key in email_sender_mod.GMAIL_REQUIRED_ENV:
+                os.environ.pop(key, None)
+            self.assertFalse(email_sender_mod.is_configured())
+
+    def test_configured_when_env_set(self):
+        with patch.dict(os.environ, self._gmail_env(), clear=False):
+            self.assertTrue(email_sender_mod.is_configured())
+
+    @patch('telemetry.email_sender.requests.post')
+    def test_access_token_posts_correct_fields(self, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {'access_token': 'tok'}
+        with patch.dict(os.environ, self._gmail_env(), clear=False):
+            token = email_sender_mod._access_token()
+        self.assertEqual(token, 'tok')
+        args, kwargs = mock_post.call_args
+        self.assertEqual(args[0], email_sender_mod.GMAIL_TOKEN_URL)
+        self.assertEqual(kwargs['data']['grant_type'], 'refresh_token')
+        self.assertEqual(kwargs['data']['refresh_token'], 'refresh-token')
+        self.assertEqual(kwargs['data']['client_id'], 'client-id')
+
+    @patch('telemetry.email_sender.requests.post')
+    def test_send_gmail_uses_raw_message(self, mock_post):
+        import base64
+        from email import message_from_bytes
+        token_resp = MagicMock(status_code=200)
+        token_resp.json.return_value = {'access_token': 'tok'}
+        send_resp = MagicMock(status_code=200)
+        send_resp.json.return_value = {}
+        mock_post.side_effect = [token_resp, send_resp]
+        with patch.dict(os.environ, self._gmail_env(), clear=False):
+            email_sender_send('Alert subject', 'Line one\nLine two', 'to@example.com')
+        args, kwargs = mock_post.call_args_list[1]
+        self.assertEqual(args[0], email_sender_mod.GMAIL_SEND_URL)
+        self.assertEqual(kwargs['headers']['Authorization'], 'Bearer tok')
+        raw = base64.urlsafe_b64decode(kwargs['json']['raw'].encode('ascii'))
+        msg = message_from_bytes(raw)
+        self.assertEqual(msg['Subject'], 'Alert subject')
+        self.assertEqual(msg['To'], 'to@example.com')
+        self.assertEqual(msg['From'], 'WIS2 Monitoring <sender@gmail.com>')
+        self.assertEqual(msg.get_payload(decode=True).decode('utf-8').rstrip('\n'), 'Line one\nLine two')
+
+    @patch('telemetry.email_sender.requests.post')
+    def test_send_error_raises_readable_message(self, mock_post):
+        token_resp = MagicMock(status_code=200)
+        token_resp.json.return_value = {'access_token': 'tok'}
+        error_resp = MagicMock(status_code=403)
+        error_resp.json.return_value = {'error': {'message': 'Daily limit exceeded'}}
+        mock_post.side_effect = [token_resp, error_resp]
+        with patch.dict(os.environ, self._gmail_env(), clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                email_sender_send('Sub', 'Body', 'to@example.com')
+        self.assertIn('403', str(ctx.exception))
+        self.assertIn('Daily limit exceeded', str(ctx.exception))
+
+    @patch('telemetry.email_sender.requests.post')
+    def test_network_error_wraps_as_runtime_error(self, mock_post):
+        mock_post.side_effect = requests.RequestException('connection timeout')
+        with patch.dict(os.environ, self._gmail_env(), clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                email_sender_send('Sub', 'Body', 'to@example.com')
+        self.assertIn('network error', str(ctx.exception))
+
+    @patch('django.core.mail.send_mail')
+    def test_fallback_to_smtp_when_not_configured(self, mock_send_mail):
+        with patch.dict(os.environ, {}, clear=False):
+            for key in email_sender_mod.GMAIL_REQUIRED_ENV:
+                os.environ.pop(key, None)
+            email_sender_send('Sub', 'Body', 'to@example.com')
+        mock_send_mail.assert_called_once_with(
+            subject='Sub',
+            message='Body',
+            from_email=None,
+            recipient_list=['to@example.com'],
+            fail_silently=False,
+        )
+
+
+class EmailResponsibleGmailTest(SimpleTestCase):
+    UUID = '00000000-0000-0000-0000-000000000000'
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.user = MagicMock()
+        self.user.id = 1
+        self.user.is_authenticated = True
+        self.user.get_full_name.return_value = 'Agent One'
+
+    def _alert(self):
+        alert = MagicMock()
+        alert.id = 'x'
+        alert.node_id = 'urn:wmo:md:node'
+        alert.display_title = 'HTTP Error: 502 Bad Gateway'
+        alert.title = 'HTTP status 502'
+        alert.event_type = 'http'
+        alert.event_time = timezone.now()
+        alert.description = 'Gateway down'
+        alert.errors = None
+        alert.tests = None
+        alert.summary = None
+        alert.ingested_at = timezone.now()
+        alert.incident_hash = 'abc'
+        return alert
+
+    def _responsible_queryset(self, responsible):
+        qs = MagicMock()
+        qs.exists.return_value = True
+        qs.__iter__.return_value = iter([responsible])
+        return qs
+
+    @patch('telemetry.models.NodeResponsible')
+    @patch('telemetry.views.IncidentEvent.objects.create')
+    @patch('telemetry.views.send_email')
+    @patch('django.shortcuts.get_object_or_404')
+    def test_success_sends_and_creates_event(self, mock_get, mock_send, mock_event, mock_responsible):
+        mock_get.return_value = self._alert()
+        responsible = MagicMock()
+        responsible.id = 1
+        responsible.name = 'Jane Doe'
+        responsible.email = 'jane@example.com'
+        mock_responsible.objects.filter.return_value = self._responsible_queryset(responsible)
+        from telemetry.views import email_responsible
+        req = self.factory.post(
+            '/alert/x/email/',
+            data=json.dumps({'responsible_ids': [1]}),
+            content_type='application/json',
+        )
+        req.user = self.user
+        resp = email_responsible(req, self.UUID)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(json.loads(resp.content)['success'])
+        self.assertEqual(mock_send.call_args.kwargs['to_email'], 'jane@example.com')
+        body = mock_send.call_args.kwargs['body']
+        self.assertIn('NODE: urn:wmo:md:node', body)
+        self.assertIn('TITLE: HTTP Error: 502 Bad Gateway | HTTP status 502', body)
+        self.assertIn('DESCRIPTION: Gateway down', body)
+        self.assertIn('EVENT_TIME:', body)
+        self.assertIn('INGESTED_AT:', body)
+        self.assertIn('AGENT NAME: Agent One', body)
+        self.assertIn('AGENT NOTE: ', body)
+        self.assertNotIn('RESPONSIBLE:', body)
+        self.assertEqual(mock_event.call_args.kwargs['event_type'], 'email_sent')
+
+    @patch('telemetry.models.NodeResponsible')
+    @patch('telemetry.views.IncidentEvent.objects.create')
+    @patch('telemetry.views.send_email')
+    @patch('django.shortcuts.get_object_or_404')
+    def test_failure_returns_502_with_message(self, mock_get, mock_send, mock_event, mock_responsible):
+        mock_get.return_value = self._alert()
+        responsible = MagicMock()
+        responsible.id = 1
+        responsible.name = 'Jane Doe'
+        responsible.email = 'jane@example.com'
+        mock_responsible.objects.filter.return_value = self._responsible_queryset(responsible)
+        mock_send.side_effect = RuntimeError('Gmail API error 403: Daily limit exceeded')
+        from telemetry.views import email_responsible
+        req = self.factory.post(
+            '/alert/x/email/',
+            data=json.dumps({'responsible_ids': [1]}),
+            content_type='application/json',
+        )
+        req.user = self.user
+        resp = email_responsible(req, self.UUID)
+        self.assertEqual(resp.status_code, 502)
+        self.assertIn('Daily limit exceeded', json.loads(resp.content)['error'])
+        self.assertFalse(mock_event.called)
+
+    @patch('django.shortcuts.get_object_or_404')
+    def test_get_returns_405(self, mock_get):
+        from telemetry.views import email_responsible
+        req = self.factory.get('/alert/x/email/')
+        req.user = self.user
+        resp = email_responsible(req, self.UUID)
         self.assertEqual(resp.status_code, 405)
