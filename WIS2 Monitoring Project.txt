@@ -445,7 +445,7 @@ Zoom: 0.9 applied globally for size reduction
       data.content.: channel, title, description, wnm, errors, tests, summary, links
     Computes: display_title, incident_hash
 
-7.4 _compute_display_title(title, description) — Display Title Rules (19 patterns)
+7.4 _compute_display_title(title, description) — Display Title Rules (20 patterns)
     "Template:" in title                    -> "Maintenance: Template Notice"
     "un-wmo-global-test" in title           -> "Maintenance: Test System"
     "CMA Global Monitor" in title           -> "Maintenance: CMA Global Monitor"
@@ -456,6 +456,7 @@ Zoom: 0.9 applied globally for size reduction
     "maintenance" (case-insensitive)        -> "Maintenance: General"
     "context deadline exceeded" in desc     -> "Timeout: context deadline exceeded"
     "unexpected EOF" in desc                -> "Network Termination: unexpected EOF"
+    "EOF" token (\bEOF\b) in desc           -> "Network Termination: unexpected EOF"
     "GOAWAY" in desc                        -> "Network Termination: server sent GOAWAY"
     "client connection lost" in desc        -> "Network Termination: client connection lost"
     "connection refused" in desc            -> "Connection Refused"

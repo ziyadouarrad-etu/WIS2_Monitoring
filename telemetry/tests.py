@@ -415,6 +415,21 @@ class ComputeDisplayTitleTest(SimpleTestCase):
     def test_unexpected_eof(self):
         self.assertEqual(_compute_display_title('t', 'unexpected EOF'), 'Network Termination: unexpected EOF')
 
+    def test_standalone_eof(self):
+        self.assertEqual(
+            _compute_display_title(
+                'wis2-gdc.weather.gc.ca',
+                'Get "https://wis2-gdc.weather.gc.ca:443/wis2-gdc-metrics.txt": EOF,collection time 2026-08-10T15:44:23Z',
+            ),
+            'Network Termination: unexpected EOF',
+        )
+
+    def test_eof_no_false_positive_on_embedded_text(self):
+        self.assertEqual(
+            _compute_display_title('geofence service', 'fetching geofence config'),
+            'geofence service',
+        )
+
     def test_goaway(self):
         self.assertEqual(_compute_display_title('t', 'server sent GOAWAY'), 'Network Termination: server sent GOAWAY')
 

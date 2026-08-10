@@ -117,6 +117,8 @@ def _compute_display_title(title, description):
         return 'Timeout: context deadline exceeded'
     if 'unexpected EOF' in d:
         return 'Network Termination: unexpected EOF'
+    if re.search(r'\bEOF\b', d):
+        return 'Network Termination: unexpected EOF'
     if 'GOAWAY' in d:
         return 'Network Termination: server sent GOAWAY'
     if 'client connection lost' in d:
