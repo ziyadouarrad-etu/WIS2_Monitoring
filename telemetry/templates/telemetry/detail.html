@@ -503,6 +503,13 @@ body::after {
 }
 .email-btn-send:hover { box-shadow: 0 0 12px rgba(77,208,196,0.3); }
 .email-btn-send:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.email-spinner {
+  display: inline-block; width: 12px; height: 12px; margin-right: 6px;
+  border: 2px solid rgba(6,35,31,0.35); border-top-color: #06231f;
+  border-radius: 50%; vertical-align: -2px;
+  animation: email-spin 0.8s linear infinite;
+}
+@keyframes email-spin { to { transform: rotate(360deg); } }
 .email-status {
   font-size: 12px; padding: 8px 12px; border-radius: 4px; margin-bottom: 10px;
   display: none; text-align: center;
@@ -2180,6 +2187,20 @@ body::after {
     if (overlay) overlay.addEventListener('click', closeMenu);
   })();
 
+  /* loading state helpers */
+  function setButtonLoading(btn, label) {
+    btn.dataset.original = btn.innerHTML;
+    btn.innerHTML = '<span class="email-spinner"></span>' + label;
+    btn.disabled = true;
+  }
+  function clearButtonLoading(btn) {
+    if (btn.dataset.original) {
+      btn.innerHTML = btn.dataset.original;
+      delete btn.dataset.original;
+    }
+    btn.disabled = false;
+  }
+
   /* email modal */
   (function(){
     var emailBtn = document.getElementById('emailBtn');
@@ -2200,7 +2221,7 @@ body::after {
         var checked = document.querySelectorAll('#emailRespList input[type=checkbox]:checked');
         var ids = Array.from(checked).map(function(cb) { return cb.value; });
         if (ids.length === 0) return;
-        sendBtn.disabled = true;
+        setButtonLoading(sendBtn, 'Sending\u2026');
         var oldStatus = modal.querySelector('.email-status');
         if (oldStatus) oldStatus.remove();
         fetch('{% url "email_responsible" alert.id %}', {
@@ -2211,18 +2232,18 @@ body::after {
           if (r.ok) {
             location.reload();
           } else {
+            clearButtonLoading(sendBtn);
             var s = document.createElement('div');
             s.className = 'email-status error';
             s.textContent = 'Failed to send email.';
             modal.querySelector('.email-modal-body').prepend(s);
           }
-          sendBtn.disabled = false;
         })['catch'](function(){
+          clearButtonLoading(sendBtn);
           var s = document.createElement('div');
           s.className = 'email-status error';
           s.textContent = 'Network error.';
           modal.querySelector('.email-modal-body').prepend(s);
-          sendBtn.disabled = false;
         });
       });
     }
@@ -2263,7 +2284,7 @@ body::after {
           showJiraError('Assign to is required.');
           return;
         }
-        createBtn.disabled = true;
+        setButtonLoading(createBtn, 'Creating\u2026');
         var old = modal.querySelector('.email-status');
         if (old) old.remove();
         fetch('{% url "create_jira_ticket" alert.id %}', {
@@ -2276,12 +2297,12 @@ body::after {
           if (res.ok && res.data.success) {
             location.reload();
           } else {
+            clearButtonLoading(createBtn);
             showJiraError(res.data.error || 'Failed to create Jira ticket.');
-            createBtn.disabled = false;
           }
         })['catch'](function(){
+          clearButtonLoading(createBtn);
           showJiraError('Network error.');
-          createBtn.disabled = false;
         });
       });
     }
