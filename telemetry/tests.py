@@ -855,14 +855,14 @@ class JiraCreateTicketTest(SimpleTestCase):
         with self._patch_env():
             key, error = jira_create_ticket_api(
                 'sum', 'desc',
-                assignee_account_id='dd1cd716-f84c-49de-bda5-8abd4a2fcdb4',
+                assignee_username='dd1cd716-f84c-49de-bda5-8abd4a2fcdb4',
                 priority='High',
             )
         self.assertEqual(key, 'TESTWIS-3')
         self.assertIsNone(error)
         fields = mock_post.call_args[1]['json']['fields']
         self.assertEqual(
-            fields['assignee']['accountId'],
+            fields['assignee']['name'],
             'dd1cd716-f84c-49de-bda5-8abd4a2fcdb4',
         )
         self.assertEqual(fields['priority']['name'], 'High')
@@ -882,7 +882,7 @@ class JiraCreateTicketTest(SimpleTestCase):
         for name in ('GISC-Toulouse', 'GISC-Casablanca', 'GISC-Washington', 'GISC-Tehran',
                      'ECCC-MSC Global Discovery Catalogue', 'MetOffice/NOAA Global Cache'):
             self.assertIn(name, GISC_TO_ASSIGNEE)
-            self.assertTrue(GISC_TO_ASSIGNEE[name]['accountId'])
+            self.assertTrue(GISC_TO_ASSIGNEE[name]['username'])
 
 
 class CreateJiraTicketViewTest(SimpleTestCase):
@@ -980,7 +980,7 @@ class CreateJiraTicketViewTest(SimpleTestCase):
         resp = create_jira_ticket(req, self.UUID)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(
-            mock_jira.call_args.kwargs['assignee_account_id'],
+            mock_jira.call_args.kwargs['assignee_username'],
             'dd1cd716-f84c-49de-bda5-8abd4a2fcdb4',
         )
         self.assertEqual(mock_jira.call_args.kwargs['priority'], 'High')

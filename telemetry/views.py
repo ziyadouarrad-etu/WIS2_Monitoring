@@ -692,7 +692,7 @@ def alert_detail(request, alert_id):
     jira_description = alert.description or jira_summary
     jira_configured = jira_is_configured()
     jira_assignees = [
-        {'name': name, 'accountId': info['accountId'], 'email': info['email']}
+        {'name': name, 'username': info['username'], 'email': info['email']}
         for name, info in GISC_TO_ASSIGNEE.items()
     ]
 
@@ -920,7 +920,7 @@ def create_jira_ticket(request, alert_id):
     key, error = jira_create_ticket(
         summary,
         description,
-        assignee_account_id=assignee,
+        assignee_username=assignee,
         priority=priority,
     )
 

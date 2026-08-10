@@ -1870,7 +1870,7 @@ body::after {
         <select id="jiraAssigneeInput" class="jira-input">
           <option value="">— Select assignee —</option>
           {% for a in jira_assignees %}
-          <option value="{{ a.accountId }}">{{ a.name }}</option>
+          <option value="{{ a.username }}">{{ a.name }}</option>
           {% endfor %}
         </select>
       </div>
