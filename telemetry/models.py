@@ -141,6 +141,7 @@ class IncidentEvent(models.Model):
         ('muted', 'Muted'),
         ('unmuted', 'Unmuted'),
         ('viewed', 'Viewed'),
+        ('jira_ticket', 'Jira Ticket'),
     ]
     incident_hash = models.TextField(db_index=True)
     alert = models.ForeignKey(Alert, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False)

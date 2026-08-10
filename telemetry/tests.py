@@ -1,10 +1,13 @@
 import hashlib
 import io
 import json
+import os
 import time as _time
 import uuid
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
+
+import requests
 
 from django.test import SimpleTestCase, RequestFactory
 from django.core.management import call_command
@@ -13,6 +16,8 @@ from django.utils import timezone
 from telemetry.views import _is_admin, get_alerts_for_user, apply_window, get_type_choices, expand_type_labels, apply_filters, apply_keyword_filter
 from telemetry.purge_scheduler import next_purge_target, sleep_until, run_purge
 from telemetry.context_processors import admin_panel
+from telemetry.jira import build_summary as jira_build_summary
+from telemetry.jira import create_jira_ticket as jira_create_ticket_api
 from wis2_ingestion import _compute_display_title, parse_wmem_record
 
 
@@ -736,3 +741,147 @@ class ContextProcessorTest(SimpleTestCase):
         req = self.factory.get('/')
         req.user = object()
         self.assertFalse(admin_panel(req)['is_admin'])
+
+
+class JiraSummaryTest(SimpleTestCase):
+    def _alert(self, display=None, title=None):
+        alert = MagicMock()
+        alert.display_title = display
+        alert.title = title
+        return alert
+
+    def test_same_titles_returns_single(self):
+        self.assertEqual(jira_build_summary(self._alert('X', 'X')), 'X')
+
+    def test_different_titles_concatenated(self):
+        self.assertEqual(
+            jira_build_summary(self._alert('Maintenance', 'CMA Global Monitor')),
+            'Maintenance | CMA Global Monitor',
+        )
+
+    def test_only_title(self):
+        self.assertEqual(jira_build_summary(self._alert(None, 'Some title')), 'Some title')
+
+    def test_none_falls_back(self):
+        self.assertEqual(jira_build_summary(self._alert(None, None)), 'Untitled Alert')
+
+
+class JiraCreateTicketTest(SimpleTestCase):
+    def _patch_env(self, **kwargs):
+        base = {
+            'JIRA_URL': 'https://jira.wmo.int',
+            'JIRA_PROJECT_KEY': 'TESTWIS',
+            'JIRA_API_TOKEN': 'tok',
+        }
+        base.update(kwargs)
+        return patch.dict(os.environ, base)
+
+    def test_unconfigured_returns_error(self):
+        with patch.dict(os.environ, {
+            'JIRA_URL': '',
+            'JIRA_PROJECT_KEY': '',
+            'JIRA_API_TOKEN': '',
+        }):
+            key, error = jira_create_ticket_api('sum', 'desc')
+        self.assertIsNone(key)
+        self.assertIn('not configured', error)
+
+    @patch('telemetry.jira.requests.post')
+    def test_success_returns_key(self, mock_post):
+        mock_post.return_value.status_code = 201
+        mock_post.return_value.json.return_value = {'key': 'TESTWIS-1'}
+        with self._patch_env():
+            key, error = jira_create_ticket_api('sum', 'desc')
+        self.assertEqual(key, 'TESTWIS-1')
+        self.assertIsNone(error)
+        sent = mock_post.call_args
+        self.assertEqual(sent[1]['json']['fields']['project']['key'], 'TESTWIS')
+        self.assertEqual(sent[1]['json']['fields']['summary'], 'sum')
+        self.assertNotIn('customfield_10002', sent[1]['json']['fields'])
+        self.assertEqual(sent[1]['headers']['Authorization'], 'Bearer tok')
+
+    @patch('telemetry.jira.requests.post')
+    def test_custom_field_included_when_configured(self, mock_post):
+        mock_post.return_value.status_code = 201
+        mock_post.return_value.json.return_value = {'key': 'TESTWIS-2'}
+        with self._patch_env(
+            JIRA_COUNTRY_FIELD_ID='customfield_10002',
+            JIRA_COUNTRY_FIELD_VALUE='morocco',
+        ):
+            key, error = jira_create_ticket_api('sum', 'desc')
+        self.assertEqual(key, 'TESTWIS-2')
+        self.assertIsNone(error)
+        fields = mock_post.call_args[1]['json']['fields']
+        self.assertEqual(fields['customfield_10002'], 'morocco')
+
+    @patch('telemetry.jira.requests.post')
+    def test_failure_returns_error_text(self, mock_post):
+        mock_post.return_value.status_code = 400
+        mock_post.return_value.text = 'bad request'
+        with self._patch_env():
+            key, error = jira_create_ticket_api('sum', 'desc')
+        self.assertIsNone(key)
+        self.assertEqual(error, 'bad request')
+
+    @patch('telemetry.jira.requests.post')
+    def test_network_error_returns_message(self, mock_post):
+        mock_post.side_effect = requests.RequestException('boom')
+        with self._patch_env():
+            key, error = jira_create_ticket_api('sum', 'desc')
+        self.assertIsNone(key)
+        self.assertEqual(error, 'boom')
+
+
+class CreateJiraTicketViewTest(SimpleTestCase):
+    UUID = '00000000-0000-0000-0000-000000000000'
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.user = MagicMock()
+        self.user.id = 1
+        self.user.is_authenticated = True
+
+    @patch('telemetry.views.IncidentEvent.objects.create')
+    @patch('telemetry.views.jira_create_ticket')
+    @patch('django.shortcuts.get_object_or_404')
+    def test_success(self, mock_get, mock_jira, mock_event):
+        alert = MagicMock()
+        alert.display_title = 'HTTP Error: 502 Bad Gateway'
+        alert.title = 'HTTP status 502'
+        alert.description = 'desc'
+        alert.incident_hash = 'abc'
+        mock_get.return_value = alert
+        mock_jira.return_value = ('TESTWIS-1', None)
+        from telemetry.views import create_jira_ticket
+        req = self.factory.post('/alert/x/jira/')
+        req.user = self.user
+        resp = create_jira_ticket(req, self.UUID)
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['key'], 'TESTWIS-1')
+        self.assertEqual(mock_event.call_args.kwargs['event_type'], 'jira_ticket')
+
+    @patch('telemetry.views.jira_create_ticket')
+    @patch('django.shortcuts.get_object_or_404')
+    def test_failure_returns_502(self, mock_get, mock_jira):
+        alert = MagicMock()
+        alert.display_title = 'X'
+        alert.title = 'X'
+        alert.description = 'desc'
+        alert.incident_hash = 'abc'
+        mock_get.return_value = alert
+        mock_jira.return_value = (None, 'boom')
+        from telemetry.views import create_jira_ticket
+        req = self.factory.post('/alert/x/jira/')
+        req.user = self.user
+        resp = create_jira_ticket(req, self.UUID)
+        self.assertEqual(resp.status_code, 502)
+        self.assertEqual(json.loads(resp.content)['error'], 'boom')
+
+    def test_get_returns_405(self):
+        from telemetry.views import create_jira_ticket
+        req = self.factory.get('/alert/x/jira/')
+        req.user = self.user
+        resp = create_jira_ticket(req, self.UUID)
+        self.assertEqual(resp.status_code, 405)

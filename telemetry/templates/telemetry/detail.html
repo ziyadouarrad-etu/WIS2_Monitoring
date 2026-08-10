@@ -423,6 +423,9 @@ body::after {
   transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
 }
 .email-btn:hover { background: var(--accent); color: #06231f; }
+.jira-summary, .jira-desc { background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+.jira-summary { color: var(--text); }
+.jira-desc { color: var(--text-secondary); }
 /* Email modal */
 .email-overlay {
   display: none; position: fixed; inset: 0; z-index: 99995;
@@ -1592,6 +1595,7 @@ body::after {
 }
 .timeline-icon-comment { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
 .timeline-icon-email_sent { background: var(--info-bg); color: var(--info); border-color: var(--info); }
+.timeline-icon-jira_ticket { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
 .timeline-icon-note_added { background: var(--warning-bg); color: var(--warning); border-color: var(--warning); }
 .timeline-icon-note_removed { background: var(--skipped-bg); color: var(--text-muted); }
 .timeline-icon-muted { background: var(--warning-bg); color: var(--warning); border-color: var(--warning); }
@@ -1792,7 +1796,8 @@ body::after {
             {% endif %}
           </div>
 
-          <button type="button" class="email-btn" id="emailBtn">&#9993; Email Responsible</button>
+          <button type="button" class="email-btn" id="emailBtn">&#9993; Send Email</button>
+          <button type="button" class="email-btn" id="jiraBtn"{% if not jira_configured %} title="Jira not configured" disabled{% endif %}>Create Jira Ticket</button>
         </div>
       </div>
     </div>
@@ -1830,6 +1835,28 @@ body::after {
       {% if node_responsibles %}
       <button type="button" class="email-btn-send" id="emailSendBtn">Send Email</button>
       {% endif %}
+    </div>
+  </div>
+
+  <div class="jira-overlay" id="jiraOverlay"></div>
+  <div class="email-modal" id="jiraModal">
+    <div class="email-modal-header">
+      <span>Create Jira Ticket</span>
+      <button type="button" class="email-modal-close" id="jiraModalClose">&times;</button>
+    </div>
+    <div class="email-modal-body">
+      <div class="email-field">
+        <label class="email-label">Summary</label>
+        <div class="jira-summary" id="jiraSummaryPreview">{{ jira_summary }}</div>
+      </div>
+      <div class="email-field">
+        <label class="email-label">Description</label>
+        <div class="jira-desc" id="jiraDescPreview">{{ jira_description|default:"—" }}</div>
+      </div>
+    </div>
+    <div class="email-modal-footer">
+      <button type="button" class="email-btn-cancel" id="jiraCancel">Cancel</button>
+      <button type="button" class="email-btn-send" id="jiraCreateBtn">Create Ticket</button>
     </div>
   </div>
 
@@ -2176,6 +2203,52 @@ body::after {
     }
   })();
 
+  /* jira modal */
+  (function(){
+    var btn = document.getElementById('jiraBtn');
+    var modal = document.getElementById('jiraModal');
+    var overlay = document.getElementById('jiraOverlay');
+    var closeBtn = document.getElementById('jiraModalClose');
+    var cancelBtn = document.getElementById('jiraCancel');
+    var createBtn = document.getElementById('jiraCreateBtn');
+    function openModal() { modal.classList.add('open'); overlay.classList.add('open'); }
+    function closeModal() { modal.classList.remove('open'); overlay.classList.remove('open'); }
+    if (btn) btn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (overlay) overlay.addEventListener('click', closeModal);
+    if (createBtn) {
+      createBtn.addEventListener('click', function(){
+        createBtn.disabled = true;
+        var old = modal.querySelector('.email-status');
+        if (old) old.remove();
+        fetch('{% url "create_jira_ticket" alert.id %}', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+          body: '{}'
+        }).then(function(r){
+          return r.json().then(function(data){ return {ok: r.ok, data: data}; });
+        }).then(function(res){
+          if (res.ok && res.data.success) {
+            location.reload();
+          } else {
+            var s = document.createElement('div');
+            s.className = 'email-status error';
+            s.textContent = res.data.error || 'Failed to create Jira ticket.';
+            modal.querySelector('.email-modal-body').prepend(s);
+            createBtn.disabled = false;
+          }
+        })['catch'](function(){
+          var s = document.createElement('div');
+          s.className = 'email-status error';
+          s.textContent = 'Network error.';
+          modal.querySelector('.email-modal-body').prepend(s);
+          createBtn.disabled = false;
+        });
+      });
+    }
+  })();
+
   })();
 
   /* raw JSON modal */
@@ -2314,6 +2387,7 @@ body::after {
     events.forEach(function(e) {
       var icon = '&#9997;';
       if (e.event_type === 'email_sent') icon = '&#9993;';
+      else if (e.event_type === 'jira_ticket') icon = '&#127915;';
       else if (e.event_type === 'note_added') icon = '&#128204;';
       else if (e.event_type === 'note_removed') icon = '&#128465;';
       else if (e.event_type === 'muted') icon = '&#128263;';

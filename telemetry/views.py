@@ -14,6 +14,11 @@ from datetime import timedelta
 from .models import Alert, Node, IncidentEvent, IncidentMute
 from .templatetags.monitor_extras import event_type_label
 
+from .jira import (
+    build_summary as jira_build_summary,
+    is_configured as jira_is_configured,
+    create_jira_ticket as jira_create_ticket,
+)
 
 def _is_admin(user):
     if not hasattr(user, '_is_admin_cached'):
@@ -277,7 +282,6 @@ def dashboard(request):
         'severity_counts': severity_counts,
         'mini_alerts': mini_alerts,
         'critical_alerts': critical_alerts,
-
         'type_choices': type_choices,
         'node_choices': node_choices,
         'source_choices': source_choices,
@@ -679,6 +683,10 @@ def alert_detail(request, alert_id):
         except Exception:
             history_page_obj = history_paginator.get_page(1)
 
+    jira_summary = jira_build_summary(alert)
+    jira_description = alert.description or jira_summary
+    jira_configured = jira_is_configured()
+
     node_responsibles = list(alert.node.responsibles.all().order_by('name')) if alert.node_id else []
 
     if alert.incident_hash:
@@ -707,6 +715,9 @@ def alert_detail(request, alert_id):
         'summary_dict': summary_dict,
         'history_page_obj': history_page_obj,
         'history_count': history_count,
+        'jira_summary': jira_summary,
+        'jira_description': jira_description,
+        'jira_configured': jira_configured,
         'node_responsibles': node_responsibles,
         'raw_json': alert.raw_json if isinstance(alert.raw_json, (dict, list)) else {},
     })
@@ -871,3 +882,41 @@ def alert_history_fragment(request, alert_id):
     return render(request, 'telemetry/history_fragment.html', ctx)
 
 
+@login_required
+def create_jira_ticket(request, alert_id):
+    from django.shortcuts import get_object_or_404
+
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    alert = get_object_or_404(
+        get_alerts_for_user(request.user),
+        id=alert_id,
+    )
+
+    summary = jira_build_summary(alert)
+    description = alert.description or summary
+
+    key, error = jira_create_ticket(
+        summary,
+        description,
+    )
+
+    if error is not None or not key:
+        return JsonResponse(
+            {"error": error or "Failed to create Jira ticket"},
+            status=502,
+        )
+
+    if alert.incident_hash:
+        IncidentEvent.objects.create(
+            incident_hash=alert.incident_hash,
+            alert=alert,
+            user=request.user,
+            event_type="jira_ticket",
+            text=f"Jira ticket created: {key}",
+        )
+
+    return JsonResponse(
+        {"success": True, "key": key},
+    )

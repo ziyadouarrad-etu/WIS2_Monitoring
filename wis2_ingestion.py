@@ -16,12 +16,10 @@ import time
 import sys
 import psycopg2
 from psycopg2.extras import execute_values, Json
-from datetime import datetime, timezone
 import logging
 import hashlib
 import uuid
 import re
-from pathlib import Path
 
 from telemetry.purge_scheduler import purge_scheduler_worker
 
@@ -82,7 +80,6 @@ BATCH_SIZE = 250
 FLUSH_INTERVAL_SEC = 5
 DB_RECONNECT_DELAY_SEC = 5
 DB_MAX_RECONNECT_ATTEMPTS = 300
-DEAD_LETTER_PATH = Path(__file__).parent / 'dead_letter.jsonl'
 
 telemetry_queue = queue.Queue(maxsize=10000)
 SYSTEM_RUNNING = True
@@ -92,23 +89,6 @@ DB_CONNECTED = True
 # =====================================================================
 # MOTEUR D'EXTRACTION & HACHAGE
 # =====================================================================
-
-
-def _write_dead_letter(batch, error):
-    """Write failed batch records to dead_letter.jsonl for manual recovery."""
-    try:
-        with open(DEAD_LETTER_PATH, 'a', encoding='utf-8') as f:
-            for record in batch:
-                entry = {
-                    'timestamp': datetime.now(timezone.utc).isoformat(),
-                    'error': str(error),
-                    'alert_id': str(record[0]) if record else None,
-                }
-                f.write(json.dumps(entry) + '\n')
-        logger.warning(f"DEAD LETTER: {len(batch)} records written to {DEAD_LETTER_PATH}")
-    except Exception as e:
-        logger.error(f"Failed to write dead letter: {e}")
-
 
 
 def _compute_display_title(title, description):
@@ -303,7 +283,7 @@ def db_writer_worker():
                 conn, cursor = _connect_db()
                 if conn is None:
                     if batch:
-                        _write_dead_letter(batch, 'DB connection permanently lost')
+                        logger.error(f"Connexion DB définitivement perdue: {len(batch)} enregistrements non insérés.")
                     break
             except psycopg2.errors.ForeignKeyViolation as e:
                 try:
@@ -325,12 +305,10 @@ def db_writer_worker():
                             conn.rollback()
                         except Exception:
                             pass
-                        _write_dead_letter(batch, insert_err)
                         batch = []
                         continue
                 else:
                     logger.error(f"Impossible d'extraire le noeud manquant de l'erreur: {e}")
-                    _write_dead_letter(batch, e)
                     batch = []
                     continue
             except Exception as e:
@@ -339,7 +317,6 @@ def db_writer_worker():
                     conn.rollback()
                 except Exception:
                     pass
-                _write_dead_letter(batch, e)
                 batch = []
 
     if conn:

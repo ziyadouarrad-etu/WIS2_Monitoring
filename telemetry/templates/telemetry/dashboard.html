@@ -798,7 +798,7 @@ body::before {
   <div class="side-panel">
     <div class="panel-card">
       <div class="panel-header">
-        <span class="live-glyph live-glyph-critical">&#9632;</span> CRITICAL <span class="live-cap">(last 20 alerts)</span>
+        <span class="live-glyph live-glyph-critical">&#9632;</span>Live CRITICAL Feed<span class="live-cap">(last 20 alerts)</span>
       </div>
       <div class="panel-body live-feed-body" id="critical-feed">
         {% for a in critical_alerts %}
@@ -888,6 +888,7 @@ body::before {
 
   </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -1049,9 +1050,10 @@ body::before {
     var panel = document.getElementById('windowPanel');
     if (!btn || !panel) return;
     function position() {
-      var rect = btn.getBoundingClientRect();
-      panel.style.left = rect.left + 'px';
-      panel.style.top = (rect.bottom + 4) + 'px';
+      var x = 0, y = 0, el = btn, pw = panel.offsetWidth;
+      while (el) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; }
+      panel.style.left = (x + btn.offsetWidth - pw) + 'px';
+      panel.style.top = (y + btn.offsetHeight + 4) + 'px';
     }
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -1060,8 +1062,8 @@ body::before {
         return;
       }
       document.querySelectorAll('[id$="Panel"]').forEach(function(el) { el.style.display = 'none'; });
-      position();
       panel.style.display = 'flex';
+      position();
     });
     panel.addEventListener('click', function(e) { e.stopPropagation(); });
     document.addEventListener('click', function() {

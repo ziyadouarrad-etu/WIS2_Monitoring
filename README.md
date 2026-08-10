@@ -66,7 +66,6 @@ Real-time alert monitoring system for the **WMO Information System 2 (WIS2)** gl
 - Batches inserts every **250 records or 5 seconds** using `psycopg2.extras.execute_values`
 - After each batch, sends `pg_notify('wis2_alerts_updates', <uuid_list>)` to wake the listener
 - Handles `ForeignKeyViolation` by auto-creating missing nodes
-- Writes failed batches to `dead_letter.jsonl` for recovery
 
 ### Stage 2: NOTIFY Listener (`telemetry/listeners.py`)
 
@@ -304,6 +303,7 @@ All endpoints require authentication (`@login_required`).
 | POST | `/alert/<uuid>/mute/` | Mute incident (`{"duration": 7200}`) |
 | POST | `/alert/<uuid>/unmute/` | Unmute incident |
 | POST | `/alert/<uuid>/email/` | Email responsible person (`{"responsible_ids": [...], "note": "..."}`) |
+| POST | `/alert/<uuid>/jira/` | Create a Jira ticket for the alert (summary = display_title + title when different, description = alert description) |
 | GET | `/alert/<uuid>/activity/` | Incident activity feed (paginated) |
 | WS | `/ws/alerts/` | WebSocket — real-time alert stream (JSON) |
 
@@ -312,4 +312,3 @@ All endpoints require authentication (`@login_required`).
 - **No Redis/Celery**: The channel layer uses `channels_postgres` (PostgreSQL NOTIFY/LISTEN) instead of Redis. The ingestion → listener pipeline also uses PostgreSQL NOTIFY directly. This keeps the stack to one database.
 - **Batch inserts with NOTIFY**: The ingestion daemon batches 250 records and sends a single `pg_notify` with the UUID list, keeping the listener lightweight (it only fetches full rows when notified).
 - **Incident hashing**: `SHA-256(title:node)` groups recurring alerts from the same node into a single incident timeline.
-- **Dead letter queue**: Failed batches are written to `dead_letter.jsonl` for manual recovery instead of being dropped.

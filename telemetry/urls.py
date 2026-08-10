@@ -22,6 +22,7 @@ urlpatterns = [
     path('alert/<uuid:alert_id>/mute/', views.incident_mute, name='incident_mute'),
     path('alert/<uuid:alert_id>/unmute/', views.incident_unmute, name='incident_unmute'),
     path('alert/<uuid:alert_id>/activity/', views.incident_activity, name='incident_activity'),
+    path('alert/<uuid:alert_id>/jira/', views.create_jira_ticket, name='create_jira_ticket'),
     path('api/alert-search/', views.alert_search, name='alert_search'),
     path('api/alerts/per-day/', views.api_alerts_per_day, name='api_alerts_per_day'),
     path('api/alert/<uuid:alert_id>/history/', views.alert_history_fragment, name='alert_history_fragment'),
