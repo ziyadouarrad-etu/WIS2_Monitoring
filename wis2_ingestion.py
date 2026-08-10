@@ -127,6 +127,8 @@ def _compute_display_title(title, description):
         return 'Connection Refused'
     if 'network is unreachable' in d:
         return 'Network Error: network is unreachable'
+    if 'no route to host' in d:
+        return 'Network Error: no route to host'
     http_match = re.search(r'HTTP status (\d{3})', d)
     if http_match:
         code = http_match.group(1)
@@ -145,6 +147,11 @@ def _compute_display_title(title, description):
         return 'Timeout: i/o timeout'
     if t.startswith('Target ') and ' is down' in t:
         return 'Target is down'
+    marker = ',collection time '
+    if d:
+        detail = d.split(marker, 1)[0] if marker in d else d
+        if not detail.strip(' ,'):
+            return 'Unknown Error: no details'
     return t
 
 

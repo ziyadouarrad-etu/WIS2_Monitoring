@@ -445,7 +445,7 @@ Zoom: 0.9 applied globally for size reduction
       data.content.: channel, title, description, wnm, errors, tests, summary, links
     Computes: display_title, incident_hash
 
-7.4 _compute_display_title(title, description) — Display Title Rules (20 patterns)
+7.4 _compute_display_title(title, description) — Display Title Rules (22 patterns)
     "Template:" in title                    -> "Maintenance: Template Notice"
     "un-wmo-global-test" in title           -> "Maintenance: Test System"
     "CMA Global Monitor" in title           -> "Maintenance: CMA Global Monitor"
@@ -460,12 +460,15 @@ Zoom: 0.9 applied globally for size reduction
     "GOAWAY" in desc                        -> "Network Termination: server sent GOAWAY"
     "client connection lost" in desc        -> "Network Termination: client connection lost"
     "connection refused" in desc            -> "Connection Refused"
+    "network is unreachable" in desc        -> "Network Error: network is unreachable"
+    "no route to host" in desc              -> "Network Error: no route to host"
     "HTTP status 502" in desc               -> "HTTP Error: 502 Bad Gateway"
     "HTTP status 403" in desc               -> "HTTP Error: 403 Forbidden"
     "expected a valid start token" in desc  -> "Invalid Response"
     "connection reset by peer" in desc      -> "Network Termination: connection reset by peer"
     "i/o timeout" in desc                   -> "Timeout: i/o timeout"
     Title starts with "Target" + "is down"  -> "Target is down"
+    desc (non-empty) stripped of ",collection time ..." is empty -> "Unknown Error: no details"
     No pattern matched                      -> Raw title as-is
 
 7.5 DB Writer Thread

@@ -430,6 +430,40 @@ class ComputeDisplayTitleTest(SimpleTestCase):
             'geofence service',
         )
 
+    def test_no_route_to_host(self):
+        self.assertEqual(
+            _compute_display_title(
+                'wis2.dwd.de',
+                'Get "https://wis2.dwd.de:443/metrics/gc_metrics.txt": '
+                'dial tcp 141.38.3.181:443: connect: no route to host,collection time 2026-08-06T11:32:02Z',
+            ),
+            'Network Error: no route to host',
+        )
+
+    def test_no_route_to_host_not_swallowed_by_unknown_rule(self):
+        self.assertEqual(
+            _compute_display_title(
+                'wis2.dwd.de',
+                'dial tcp 141.38.3.181:443: connect: no route to host,collection time 2026-08-06T11:32:02Z',
+            ),
+            'Network Error: no route to host',
+        )
+
+    def test_collection_time_only_unknown(self):
+        self.assertEqual(
+            _compute_display_title('gc.wis.cma.cn', ',collection time 0001-01-01T00:00:00Z'),
+            'Unknown Error: no details',
+        )
+
+    def test_empty_description_keeps_raw_title(self):
+        self.assertEqual(_compute_display_title('gc.wis.cma.cn', ''), 'gc.wis.cma.cn')
+
+    def test_unknown_does_not_override_target(self):
+        self.assertEqual(
+            _compute_display_title('Target gc.wis.cma.cn:443 is down', ',collection time 0001-01-01T00:00:00Z'),
+            'Target is down',
+        )
+
     def test_goaway(self):
         self.assertEqual(_compute_display_title('t', 'server sent GOAWAY'), 'Network Termination: server sent GOAWAY')
 

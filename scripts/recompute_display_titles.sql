@@ -16,6 +16,12 @@
 -- With standard_conforming_strings=on (default since PG 9.1) the
 -- backslashes are preserved verbatim, so the regex engine sees
 -- \yEOF\y (word boundary "EOF"). Do NOT write it as E'\yEOF\y'.
+--
+-- ORDER MATTERS: branches are evaluated top to bottom. The "Unknown
+-- Error: no details" branch MUST stay after the Target branch (and after
+-- every error branch) so real errors are never swallowed by it. It only
+-- fires for NON-EMPTY descriptions whose only content is the
+-- ",collection time ..." suffix.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -39,6 +45,7 @@
 --          WHEN COALESCE(a.description,'') LIKE '%client connection lost%' THEN 'Network Termination: client connection lost'
 --          WHEN COALESCE(a.description,'') LIKE '%connection refused%' THEN 'Connection Refused'
 --          WHEN COALESCE(a.description,'') LIKE '%network is unreachable%' THEN 'Network Error: network is unreachable'
+--          WHEN COALESCE(a.description,'') LIKE '%no route to host%' THEN 'Network Error: no route to host'
 --          WHEN COALESCE(a.description,'') ~ 'HTTP status [0-9]{3}' THEN
 --            'HTTP Error: ' || SUBSTRING(COALESCE(a.description,'') FROM 'HTTP status ([0-9]{3})')
 --            || CASE SUBSTRING(COALESCE(a.description,'') FROM 'HTTP status ([0-9]{3})')
@@ -51,6 +58,7 @@
 --          WHEN COALESCE(a.description,'') LIKE '%connection reset by peer%' THEN 'Network Termination: connection reset by peer'
 --          WHEN COALESCE(a.description,'') LIKE '%i/o timeout%' THEN 'Timeout: i/o timeout'
 --          WHEN COALESCE(a.title,'') LIKE 'Target %' AND COALESCE(a.title,'') LIKE '% is down%' THEN 'Target is down'
+--          WHEN COALESCE(a.description,'') <> '' AND REGEXP_REPLACE(COALESCE(a.description,''), ',collection time .*$', '') = '' THEN 'Unknown Error: no details'
 --          ELSE COALESCE(a.title,'') END AS new_title
 -- FROM alerts a
 -- WHERE a.display_title IS DISTINCT FROM (
@@ -70,6 +78,7 @@
 --          WHEN COALESCE(a.description,'') LIKE '%client connection lost%' THEN 'Network Termination: client connection lost'
 --          WHEN COALESCE(a.description,'') LIKE '%connection refused%' THEN 'Connection Refused'
 --          WHEN COALESCE(a.description,'') LIKE '%network is unreachable%' THEN 'Network Error: network is unreachable'
+--          WHEN COALESCE(a.description,'') LIKE '%no route to host%' THEN 'Network Error: no route to host'
 --          WHEN COALESCE(a.description,'') ~ 'HTTP status [0-9]{3}' THEN
 --            'HTTP Error: ' || SUBSTRING(COALESCE(a.description,'') FROM 'HTTP status ([0-9]{3})')
 --            || CASE SUBSTRING(COALESCE(a.description,'') FROM 'HTTP status ([0-9]{3})')
@@ -82,6 +91,7 @@
 --          WHEN COALESCE(a.description,'') LIKE '%connection reset by peer%' THEN 'Network Termination: connection reset by peer'
 --          WHEN COALESCE(a.description,'') LIKE '%i/o timeout%' THEN 'Timeout: i/o timeout'
 --          WHEN COALESCE(a.title,'') LIKE 'Target %' AND COALESCE(a.title,'') LIKE '% is down%' THEN 'Target is down'
+--          WHEN COALESCE(a.description,'') <> '' AND REGEXP_REPLACE(COALESCE(a.description,''), ',collection time .*$', '') = '' THEN 'Unknown Error: no details'
 --          ELSE COALESCE(a.title,'') END)
 -- ORDER BY a.event_time DESC;
 
@@ -109,6 +119,7 @@ FROM (
             WHEN d LIKE '%client connection lost%'    THEN 'Network Termination: client connection lost'
             WHEN d LIKE '%connection refused%'        THEN 'Connection Refused'
             WHEN d LIKE '%network is unreachable%'    THEN 'Network Error: network is unreachable'
+            WHEN d LIKE '%no route to host%'          THEN 'Network Error: no route to host'
 
             WHEN d ~ 'HTTP status [0-9]{3}' THEN
                 'HTTP Error: ' || SUBSTRING(d FROM 'HTTP status ([0-9]{3})')
@@ -129,6 +140,7 @@ FROM (
             WHEN d LIKE '%i/o timeout%'                  THEN 'Timeout: i/o timeout'
 
             WHEN t LIKE 'Target %' AND t LIKE '% is down%' THEN 'Target is down'
+            WHEN d <> '' AND REGEXP_REPLACE(d, ',collection time .*$', '') = '' THEN 'Unknown Error: no details'
 
             ELSE t
         END AS new_title
