@@ -312,3 +312,11 @@ All endpoints require authentication (`@login_required`).
 - **No Redis/Celery**: The channel layer uses `channels_postgres` (PostgreSQL NOTIFY/LISTEN) instead of Redis. The ingestion → listener pipeline also uses PostgreSQL NOTIFY directly. This keeps the stack to one database.
 - **Batch inserts with NOTIFY**: The ingestion daemon batches 250 records and sends a single `pg_notify` with the UUID list, keeping the listener lightweight (it only fetches full rows when notified).
 - **Incident hashing**: `SHA-256(title:node)` groups recurring alerts from the same node into a single incident timeline.
+
+## Services
+- wis2-daphne
+- wis2-ingestion
+- wis2-listener
+
+## SQL cleanup
+psql -h <DB_HOST> -U <DB_USER> -d wis2_alerts -f scripts/recompute_display_titles.sql
