@@ -885,6 +885,7 @@ def alert_history_fragment(request, alert_id):
 @login_required
 def create_jira_ticket(request, alert_id):
     from django.shortcuts import get_object_or_404
+    import json
 
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
@@ -894,8 +895,15 @@ def create_jira_ticket(request, alert_id):
         id=alert_id,
     )
 
-    summary = jira_build_summary(alert)
-    description = alert.description or summary
+    data = {}
+    if request.body:
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            data = {}
+
+    summary = (data.get("summary") or "").strip() or jira_build_summary(alert)
+    description = (data.get("description") or "").strip() or (alert.description or summary)
 
     key, error = jira_create_ticket(
         summary,

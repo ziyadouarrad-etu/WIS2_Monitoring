@@ -423,9 +423,12 @@ body::after {
   transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
 }
 .email-btn:hover { background: var(--accent); color: #06231f; }
-.jira-summary, .jira-desc { background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
-.jira-summary { color: var(--text); }
-.jira-desc { color: var(--text-secondary); }
+.jira-input {
+  width: 100%; font-family: var(--font-mono); font-size: 13px;
+  padding: 8px 10px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px; outline: none;
+}
+.jira-input:focus { border-color: var(--accent); }
 /* Email modal */
 .email-overlay {
   display: none; position: fixed; inset: 0; z-index: 99995;
@@ -1851,7 +1854,7 @@ body::after {
     </div>
   </div>
 
-  <div class="jira-overlay" id="jiraOverlay"></div>
+  <div class="email-overlay" id="jiraOverlay"></div>
   <div class="email-modal" id="jiraModal">
     <div class="email-modal-header">
       <span>Create Jira Ticket</span>
@@ -1859,12 +1862,12 @@ body::after {
     </div>
     <div class="email-modal-body">
       <div class="email-field">
-        <label class="email-label">Summary</label>
-        <div class="jira-summary" id="jiraSummaryPreview">{{ jira_summary }}</div>
+        <label class="email-label" for="jiraSummaryInput">Summary</label>
+        <input type="text" class="jira-input" id="jiraSummaryInput" value="{{ jira_summary }}" maxlength="255" placeholder="Ticket summary">
       </div>
       <div class="email-field">
-        <label class="email-label">Description</label>
-        <div class="jira-desc" id="jiraDescPreview">{{ jira_description|default:"—" }}</div>
+        <label class="email-label" for="jiraDescInput">Description</label>
+        <textarea id="jiraDescInput" class="email-textarea" rows="8" placeholder="Ticket description">{{ jira_description|default:"" }}</textarea>
       </div>
     </div>
     <div class="email-modal-footer">
@@ -2224,6 +2227,8 @@ body::after {
     var closeBtn = document.getElementById('jiraModalClose');
     var cancelBtn = document.getElementById('jiraCancel');
     var createBtn = document.getElementById('jiraCreateBtn');
+    var summaryInput = document.getElementById('jiraSummaryInput');
+    var descInput = document.getElementById('jiraDescInput');
     function openModal() { modal.classList.add('open'); overlay.classList.add('open'); }
     function closeModal() { modal.classList.remove('open'); overlay.classList.remove('open'); }
     if (btn) btn.addEventListener('click', openModal);
@@ -2232,13 +2237,21 @@ body::after {
     if (overlay) overlay.addEventListener('click', closeModal);
     if (createBtn) {
       createBtn.addEventListener('click', function(){
+        var summary = summaryInput ? summaryInput.value.trim() : '';
+        if (!summary) {
+          var missing = document.createElement('div');
+          missing.className = 'email-status error';
+          missing.textContent = 'Summary is required.';
+          modal.querySelector('.email-modal-body').prepend(missing);
+          return;
+        }
         createBtn.disabled = true;
         var old = modal.querySelector('.email-status');
         if (old) old.remove();
         fetch('{% url "create_jira_ticket" alert.id %}', {
           method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-          body: '{}'
+          body: JSON.stringify({summary: summary, description: descInput ? descInput.value : ''})
         }).then(function(r){
           return r.json().then(function(data){ return {ok: r.ok, data: data}; });
         }).then(function(res){

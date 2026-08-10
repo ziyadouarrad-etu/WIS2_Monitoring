@@ -862,6 +862,29 @@ class CreateJiraTicketViewTest(SimpleTestCase):
         self.assertEqual(data['key'], 'TESTWIS-1')
         self.assertEqual(mock_event.call_args.kwargs['event_type'], 'jira_ticket')
 
+    @patch('telemetry.views.IncidentEvent.objects.create')
+    @patch('telemetry.views.jira_create_ticket')
+    @patch('django.shortcuts.get_object_or_404')
+    def test_uses_submitted_summary_and_description(self, mock_get, mock_jira, mock_event):
+        alert = MagicMock()
+        alert.display_title = 'HTTP Error: 502 Bad Gateway'
+        alert.title = 'HTTP status 502'
+        alert.description = 'desc'
+        alert.incident_hash = 'abc'
+        mock_get.return_value = alert
+        mock_jira.return_value = ('TESTWIS-1', None)
+        from telemetry.views import create_jira_ticket
+        req = self.factory.post(
+            '/alert/x/jira/',
+            data=json.dumps({'summary': 'Custom summary', 'description': 'Custom desc'}),
+            content_type='application/json',
+        )
+        req.user = self.user
+        resp = create_jira_ticket(req, self.UUID)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(mock_jira.call_args.args[0], 'Custom summary')
+        self.assertEqual(mock_jira.call_args.args[1], 'Custom desc')
+
     @patch('telemetry.views.jira_create_ticket')
     @patch('django.shortcuts.get_object_or_404')
     def test_failure_returns_502(self, mock_get, mock_jira):
