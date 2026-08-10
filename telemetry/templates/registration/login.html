@@ -112,16 +112,35 @@ body { padding-top: 0; background: #04080f; overflow: hidden; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 14px;
   margin-bottom: 22px;
 }
 .agencies img { object-fit: contain; opacity: 0.95; }
-.agencies .ag-maroc { height: 52px; }
+.ag-logo {
+  transition: opacity 0.2s;
+  opacity: 0;
+  animation: logoIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.agencies .ag-maroc {
+  animation-delay: 0.15s;
+  height: 66px;
+}
 .agencies .ag-wmo {
-  height: 46px;
-  padding: 0 10px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 10px;
+  animation-delay: 0.3s;
+  height: 66px;
+  filter: brightness(0) invert(1);
+}
+.ag-divider {
+  width: 1px;
+  height: 42px;
+  background: linear-gradient(180deg, transparent, rgba(146,165,191,0.4), transparent);
+}
+@keyframes logoIn {
+  from { opacity: 0; }
+  to   { opacity: 0.95; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ag-logo { animation: none; opacity: 0.95; }
 }
 .auth-card h2 {
   font-family: var(--font-display);
@@ -200,8 +219,9 @@ body { padding-top: 0; background: #04080f; overflow: hidden; }
 /* ============ responsive ============ */
 @media (max-width: 460px) {
   .auth-card { padding: 32px 28px 24px; }
-  .agencies .ag-maroc { height: 44px; }
-  .agencies .ag-wmo { height: 38px; padding: 0 8px; }
+  .agencies .ag-maroc { height: 54px; }
+  .agencies .ag-wmo { height: 54px; }
+  .ag-divider { height: 34px; }
 }
 {% endblock %}
 
@@ -222,8 +242,9 @@ body { padding-top: 0; background: #04080f; overflow: hidden; }
 
   <div class="auth-card">
     <div class="agencies">
-      <img class="ag-maroc" src="{% static 'marocMeteo.png' %}" alt="MarocMeteo">
-      <img class="ag-wmo" src="{% static 'WMO.png' %}" alt="World Meteorological Organization">
+      <img class="ag-logo ag-maroc" src="{% static 'marocMeteo.png' %}" alt="MarocMeteo">
+      <span class="ag-divider" aria-hidden="true"></span>
+      <img class="ag-logo ag-wmo" src="{% static 'WMO.png' %}" alt="World Meteorological Organization">
     </div>
     <h2>WIS2 Monitoring Events</h2>
 

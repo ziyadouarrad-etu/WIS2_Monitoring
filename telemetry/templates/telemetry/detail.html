@@ -551,6 +551,19 @@ body::after {
   font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6;
   color: var(--text-secondary); white-space: pre-wrap; word-break: break-all;
 }
+/* Raw JSON syntax highlight (VS Code Dark+ palette) */
+.j-key { color: #9cdcfe; }
+.j-str { color: #ce9178; }
+.j-num { color: #b5cea8; }
+.j-bool { color: #569cd6; }
+.j-null { color: #569cd6; }
+.j-punc { color: #808080; }
+[data-theme="light"] .j-key { color: #0451a5; }
+[data-theme="light"] .j-str { color: #a31515; }
+[data-theme="light"] .j-num { color: #098658; }
+[data-theme="light"] .j-bool { color: #0000ff; }
+[data-theme="light"] .j-null { color: #0000ff; }
+[data-theme="light"] .j-punc { color: #808080; }
 .rawjson-modal-footer {
   display: flex; justify-content: flex-end; gap: 8px;
   padding: 12px 18px; border-top: 1px solid var(--border);
@@ -2267,8 +2280,60 @@ body::after {
     var pre = document.getElementById('rawJsonPre');
     var feedback = document.getElementById('rawJsonCopyFeedback');
     var feedbackTimer = null;
+    var PAD = '  ';
+    function escHtml(s) {
+      return s.replace(/[&<>"]/g, function(c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function indent(depth) {
+      var out = '';
+      for (var i = 0; i < depth; i++) out += PAD;
+      return out;
+    }
+    function highlightJson(value, depth) {
+      depth = depth || 0;
+      var out = [];
+      if (value === null) {
+        out.push('<span class="j-null">null</span>');
+      } else if (Array.isArray(value)) {
+        if (value.length === 0) {
+          out.push('<span class="j-punc">[]</span>');
+        } else {
+          out.push('<span class="j-punc">[</span>');
+          value.forEach(function(item, i) {
+            out.push('\n' + indent(depth + 1));
+            out.push(highlightJson(item, depth + 1));
+            if (i < value.length - 1) out.push('<span class="j-punc">,</span>');
+          });
+          out.push('\n' + indent(depth) + '<span class="j-punc">]</span>');
+        }
+      } else if (typeof value === 'object') {
+        var keys = Object.keys(value);
+        if (keys.length === 0) {
+          out.push('<span class="j-punc">{}</span>');
+        } else {
+          out.push('<span class="j-punc">{</span>');
+          keys.forEach(function(k, i) {
+            out.push('\n' + indent(depth + 1) + '<span class="j-key">"' + escHtml(k) + '"</span><span class="j-punc">:</span> ');
+            out.push(highlightJson(value[k], depth + 1));
+            if (i < keys.length - 1) out.push('<span class="j-punc">,</span>');
+          });
+          out.push('\n' + indent(depth) + '<span class="j-punc">}</span>');
+        }
+      } else if (typeof value === 'string') {
+        out.push('<span class="j-str">"' + escHtml(value) + '"</span>');
+      } else if (typeof value === 'number') {
+        out.push('<span class="j-num">' + value + '</span>');
+      } else if (typeof value === 'boolean') {
+        out.push('<span class="j-bool">' + value + '</span>');
+      } else {
+        out.push('<span class="j-str">"' + escHtml(String(value)) + '"</span>');
+      }
+      return out.join('');
+    }
     function openModal() {
-      if (pre) pre.textContent = JSON.stringify(rawData, null, 2);
+      if (pre) pre.innerHTML = highlightJson(rawData);
       modal.classList.add('open'); overlay.classList.add('open');
     }
     function closeModal() {
