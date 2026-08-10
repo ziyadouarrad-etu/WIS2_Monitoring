@@ -18,6 +18,8 @@ from telemetry.purge_scheduler import next_purge_target, sleep_until, run_purge
 from telemetry.context_processors import admin_panel
 from telemetry.jira import build_summary as jira_build_summary
 from telemetry.jira import create_jira_ticket as jira_create_ticket_api
+from telemetry.jira import priority_for_severity as jira_priority_for_severity
+from telemetry.jira import GISC_TO_ASSIGNEE
 from telemetry import email_sender as email_sender_mod
 from telemetry.email_sender import send_email as email_sender_send
 from wis2_ingestion import _compute_display_title, parse_wmem_record
@@ -833,6 +835,55 @@ class JiraCreateTicketTest(SimpleTestCase):
         self.assertIsNone(key)
         self.assertEqual(error, 'boom')
 
+    def test_priority_critical_high(self):
+        self.assertEqual(jira_priority_for_severity('CRITICAL'), 'High')
+
+    def test_priority_error_medium(self):
+        self.assertEqual(jira_priority_for_severity('ERROR'), 'Medium')
+
+    def test_priority_other_low(self):
+        for sev in ('WARNING', 'INFO', 'DEBUG', 'UNKNOWN', '', None):
+            self.assertEqual(jira_priority_for_severity(sev), 'Low')
+
+    def test_priority_case_insensitive(self):
+        self.assertEqual(jira_priority_for_severity('critical'), 'High')
+
+    @patch('telemetry.jira.requests.post')
+    def test_assignee_and_priority_included_in_payload(self, mock_post):
+        mock_post.return_value.status_code = 201
+        mock_post.return_value.json.return_value = {'key': 'TESTWIS-3'}
+        with self._patch_env():
+            key, error = jira_create_ticket_api(
+                'sum', 'desc',
+                assignee_account_id='dd1cd716-f84c-49de-bda5-8abd4a2fcdb4',
+                priority='High',
+            )
+        self.assertEqual(key, 'TESTWIS-3')
+        self.assertIsNone(error)
+        fields = mock_post.call_args[1]['json']['fields']
+        self.assertEqual(
+            fields['assignee']['accountId'],
+            'dd1cd716-f84c-49de-bda5-8abd4a2fcdb4',
+        )
+        self.assertEqual(fields['priority']['name'], 'High')
+
+    @patch('telemetry.jira.requests.post')
+    def test_assignee_and_priority_omitted_when_not_given(self, mock_post):
+        mock_post.return_value.status_code = 201
+        mock_post.return_value.json.return_value = {'key': 'TESTWIS-4'}
+        with self._patch_env():
+            key, error = jira_create_ticket_api('sum', 'desc')
+        self.assertEqual(key, 'TESTWIS-4')
+        fields = mock_post.call_args[1]['json']['fields']
+        self.assertNotIn('assignee', fields)
+        self.assertNotIn('priority', fields)
+
+    def test_gisc_assignees_cover_expected_giscs(self):
+        for name in ('GISC-Toulouse', 'GISC-Casablanca', 'GISC-Washington', 'GISC-Tehran',
+                     'ECCC-MSC Global Discovery Catalogue', 'MetOffice/NOAA Global Cache'):
+            self.assertIn(name, GISC_TO_ASSIGNEE)
+            self.assertTrue(GISC_TO_ASSIGNEE[name]['accountId'])
+
 
 class CreateJiraTicketViewTest(SimpleTestCase):
     UUID = '00000000-0000-0000-0000-000000000000'
@@ -903,6 +954,59 @@ class CreateJiraTicketViewTest(SimpleTestCase):
         resp = create_jira_ticket(req, self.UUID)
         self.assertEqual(resp.status_code, 502)
         self.assertEqual(json.loads(resp.content)['error'], 'boom')
+
+    @patch('telemetry.views.IncidentEvent.objects.create')
+    @patch('telemetry.views.jira_create_ticket')
+    @patch('django.shortcuts.get_object_or_404')
+    def test_sends_assignee_and_priority(self, mock_get, mock_jira, mock_event):
+        alert = MagicMock()
+        alert.display_title = 'HTTP Error: 502 Bad Gateway'
+        alert.title = 'HTTP status 502'
+        alert.description = 'desc'
+        alert.severity = 'CRITICAL'
+        alert.incident_hash = 'abc'
+        mock_get.return_value = alert
+        mock_jira.return_value = ('TESTWIS-1', None)
+        from telemetry.views import create_jira_ticket
+        req = self.factory.post(
+            '/alert/x/jira/',
+            data=json.dumps({
+                'summary': 'Custom summary',
+                'assignee': 'dd1cd716-f84c-49de-bda5-8abd4a2fcdb4',
+            }),
+            content_type='application/json',
+        )
+        req.user = self.user
+        resp = create_jira_ticket(req, self.UUID)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            mock_jira.call_args.kwargs['assignee_account_id'],
+            'dd1cd716-f84c-49de-bda5-8abd4a2fcdb4',
+        )
+        self.assertEqual(mock_jira.call_args.kwargs['priority'], 'High')
+
+    @patch('telemetry.views.IncidentEvent.objects.create')
+    @patch('telemetry.views.jira_create_ticket')
+    @patch('django.shortcuts.get_object_or_404')
+    def test_priority_medium_for_error(self, mock_get, mock_jira, mock_event):
+        alert = MagicMock()
+        alert.display_title = 'X'
+        alert.title = 'X'
+        alert.description = 'desc'
+        alert.severity = 'ERROR'
+        alert.incident_hash = 'abc'
+        mock_get.return_value = alert
+        mock_jira.return_value = ('TESTWIS-1', None)
+        from telemetry.views import create_jira_ticket
+        req = self.factory.post(
+            '/alert/x/jira/',
+            data=json.dumps({'assignee': 'c8ace557-1959-498e-9c86-bab6658f086a'}),
+            content_type='application/json',
+        )
+        req.user = self.user
+        resp = create_jira_ticket(req, self.UUID)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(mock_jira.call_args.kwargs['priority'], 'Medium')
 
     def test_get_returns_405(self):
         from telemetry.views import create_jira_ticket

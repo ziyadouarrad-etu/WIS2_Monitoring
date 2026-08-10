@@ -19,6 +19,8 @@ from .jira import (
     build_summary as jira_build_summary,
     is_configured as jira_is_configured,
     create_jira_ticket as jira_create_ticket,
+    priority_for_severity as jira_priority_for_severity,
+    GISC_TO_ASSIGNEE,
 )
 from .email_sender import send_email
 
@@ -689,6 +691,10 @@ def alert_detail(request, alert_id):
     jira_summary = jira_build_summary(alert)
     jira_description = alert.description or jira_summary
     jira_configured = jira_is_configured()
+    jira_assignees = [
+        {'name': name, 'accountId': info['accountId'], 'email': info['email']}
+        for name, info in GISC_TO_ASSIGNEE.items()
+    ]
 
     node_responsibles = list(alert.node.responsibles.all().order_by('name')) if alert.node_id else []
 
@@ -721,6 +727,7 @@ def alert_detail(request, alert_id):
         'jira_summary': jira_summary,
         'jira_description': jira_description,
         'jira_configured': jira_configured,
+        'jira_assignees': jira_assignees,
         'node_responsibles': node_responsibles,
         'raw_json': alert.raw_json if isinstance(alert.raw_json, (dict, list)) else {},
     })
@@ -907,10 +914,14 @@ def create_jira_ticket(request, alert_id):
 
     summary = (data.get("summary") or "").strip() or jira_build_summary(alert)
     description = (data.get("description") or "").strip() or (alert.description or summary)
+    assignee = (data.get("assignee") or "").strip()
+    priority = jira_priority_for_severity(alert.severity)
 
     key, error = jira_create_ticket(
         summary,
         description,
+        assignee_account_id=assignee,
+        priority=priority,
     )
 
     if error is not None or not key:

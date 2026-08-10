@@ -1866,6 +1866,15 @@ body::after {
         <input type="text" class="jira-input" id="jiraSummaryInput" value="{{ jira_summary }}" maxlength="255" placeholder="Ticket summary">
       </div>
       <div class="email-field">
+        <label class="email-label" for="jiraAssigneeInput">Assign to:</label>
+        <select id="jiraAssigneeInput" class="jira-input">
+          <option value="">— Select assignee —</option>
+          {% for a in jira_assignees %}
+          <option value="{{ a.accountId }}">{{ a.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="email-field">
         <label class="email-label" for="jiraDescInput">Description</label>
         <textarea id="jiraDescInput" class="email-textarea" rows="8" placeholder="Ticket description">{{ jira_description|default:"" }}</textarea>
       </div>
@@ -2228,6 +2237,7 @@ body::after {
     var cancelBtn = document.getElementById('jiraCancel');
     var createBtn = document.getElementById('jiraCreateBtn');
     var summaryInput = document.getElementById('jiraSummaryInput');
+    var assigneeInput = document.getElementById('jiraAssigneeInput');
     var descInput = document.getElementById('jiraDescInput');
     function openModal() { modal.classList.add('open'); overlay.classList.add('open'); }
     function closeModal() { modal.classList.remove('open'); overlay.classList.remove('open'); }
@@ -2235,14 +2245,22 @@ body::after {
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
     if (overlay) overlay.addEventListener('click', closeModal);
+    function showJiraError(text) {
+      var s = document.createElement('div');
+      s.className = 'email-status error';
+      s.textContent = text;
+      modal.querySelector('.email-modal-body').prepend(s);
+    }
     if (createBtn) {
       createBtn.addEventListener('click', function(){
         var summary = summaryInput ? summaryInput.value.trim() : '';
+        var assignee = assigneeInput ? assigneeInput.value : '';
         if (!summary) {
-          var missing = document.createElement('div');
-          missing.className = 'email-status error';
-          missing.textContent = 'Summary is required.';
-          modal.querySelector('.email-modal-body').prepend(missing);
+          showJiraError('Summary is required.');
+          return;
+        }
+        if (!assignee) {
+          showJiraError('Assign to is required.');
           return;
         }
         createBtn.disabled = true;
@@ -2251,24 +2269,18 @@ body::after {
         fetch('{% url "create_jira_ticket" alert.id %}', {
           method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-          body: JSON.stringify({summary: summary, description: descInput ? descInput.value : ''})
+          body: JSON.stringify({summary: summary, description: descInput ? descInput.value : '', assignee: assignee})
         }).then(function(r){
           return r.json().then(function(data){ return {ok: r.ok, data: data}; });
         }).then(function(res){
           if (res.ok && res.data.success) {
             location.reload();
           } else {
-            var s = document.createElement('div');
-            s.className = 'email-status error';
-            s.textContent = res.data.error || 'Failed to create Jira ticket.';
-            modal.querySelector('.email-modal-body').prepend(s);
+            showJiraError(res.data.error || 'Failed to create Jira ticket.');
             createBtn.disabled = false;
           }
         })['catch'](function(){
-          var s = document.createElement('div');
-          s.className = 'email-status error';
-          s.textContent = 'Network error.';
-          modal.querySelector('.email-modal-body').prepend(s);
+          showJiraError('Network error.');
           createBtn.disabled = false;
         });
       });
