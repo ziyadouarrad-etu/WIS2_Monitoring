@@ -319,8 +319,39 @@ All endpoints require authentication (`@login_required`).
 - wis2-ingestion
 - wis2-listener
 
-## SQL cleanup
+## Display Title Maintenance
+
+`display_title` is computed **once, at ingestion time** by `_compute_display_title()` (`wis2_ingestion.py`). Rules are matched top-to-bottom (first match wins); an event matching no rule keeps the publisher's raw title (e.g., hostname). Editing rules never fixes already-stored rows — that is what the backfill script is for.
+
+### When a new alert shows an unreadable title
+
+**Case A — a recurring error pattern has no rule yet**
+
+1. Open the event detail page → `{ } See Full Raw JSON` → read the real description text.
+2. Add a branch to `_compute_display_title()` in `wis2_ingestion.py`, placed **before** more generic branches. The `Unknown Error: no details` branch must stay **last**.
+3. Add a test case in `ComputeDisplayTitleTest` (`telemetry/tests.py`).
+4. Mirror the branch in `scripts/recompute_display_titles.sql` — the CASE logic exists in **three places** there (preview block ×2 and the UPDATE block) and must stay in the same order as the Python function.
+5. Deploy and heal history:
+
+```bash
+git push                      # local
+# on the server:
+git pull && sudo systemctl restart wis2-ingestion
 psql -h localhost -U wis2_admin -d wis2_alerts -f scripts/recompute_display_titles.sql
+```
+
+**Case B — the pattern is already covered by a generic rule**
+
+Do nothing for future events; they categorize automatically at ingest. Only rows stored *before* the rule was deployed need a backfill re-run (same `psql` command as above).
+
+**Case C — one-off junk that matches no rule**
+
+Ignore it. The raw-title fallback is intentional; only add a rule if the same junk recurs across multiple events/subjects.
+
+### Backfill safety notes
+
+- The script is idempotent: it only updates rows whose recomputed title differs (`IS DISTINCT FROM` guard).
+- Regex quoting gotcha: `\yEOF\y` must stay a plain string literal (no `E''` prefix) so Postgres receives literal word-boundary backslashes. See the header of the script for details.
 
 ## WIS2 Systemd Service Management
 
