@@ -321,3 +321,201 @@ All endpoints require authentication (`@login_required`).
 
 ## SQL cleanup
 psql -h localhost -U wis2_admin -d wis2_alerts -f scripts/recompute_display_titles.sql
+
+## WIS2 Systemd Service Management
+
+### 1. Modify a service
+
+Service files are located in:
+
+```bash
+/etc/systemd/system/
+```
+
+Edit a service with:
+
+```bash
+sudo nano /etc/systemd/system/wis2-daphne.service
+sudo nano /etc/systemd/system/wis2-ingestion.service
+sudo nano /etc/systemd/system/wis2-listener.service
+```
+
+After modifying a service file, always reload systemd:
+
+```bash
+sudo systemctl daemon-reload
+```
+
+If you modified the `[Unit]` or `[Install]` sections, the service should contain:
+
+```ini
+[Unit]
+PartOf=wis2.target
+```
+
+and:
+
+```ini
+[Install]
+WantedBy=wis2.target
+```
+
+---
+
+### 2. Start services
+
+**Individual service:**
+
+```bash
+sudo systemctl start wis2-daphne.service
+sudo systemctl start wis2-ingestion.service
+sudo systemctl start wis2-listener.service
+```
+
+**All three through the umbrella target:**
+
+```bash
+sudo systemctl start wis2.target
+```
+
+**Multiple individual services:**
+
+```bash
+sudo systemctl start wis2-daphne.service wis2-ingestion.service
+```
+
+---
+
+### 3. Stop services
+
+**Individual service:**
+
+```bash
+sudo systemctl stop wis2-daphne.service
+sudo systemctl stop wis2-ingestion.service
+sudo systemctl stop wis2-listener.service
+```
+
+**The umbrella target:**
+
+```bash
+sudo systemctl stop wis2.target
+```
+
+---
+
+### 4. Restart services
+
+**Individual service:**
+
+```bash
+sudo systemctl restart wis2-daphne.service
+sudo systemctl restart wis2-ingestion.service
+sudo systemctl restart wis2-listener.service
+```
+
+**Entire WIS2 stack:**
+
+```bash
+sudo systemctl restart wis2.target
+```
+
+---
+
+### 5. Check status
+
+**Individual service:**
+
+```bash
+sudo systemctl status wis2-daphne.service
+sudo systemctl status wis2-ingestion.service
+sudo systemctl status wis2-listener.service
+```
+
+**All three at once:**
+
+```bash
+sudo systemctl status wis2-daphne.service wis2-ingestion.service wis2-listener.service
+```
+
+**Umbrella target:**
+
+```bash
+sudo systemctl status wis2.target
+```
+
+Look for:
+
+```text
+Active: active (running)
+```
+
+for services, and:
+
+```text
+Active: active
+```
+
+for the target.
+
+---
+
+### 6. Enable / disable at boot
+
+The individual services remain independently enabled:
+
+```bash
+sudo systemctl enable wis2-daphne.service
+sudo systemctl enable wis2-ingestion.service
+sudo systemctl enable wis2-listener.service
+```
+
+The umbrella target is also enabled:
+
+```bash
+sudo systemctl enable wis2.target
+```
+
+To prevent an individual service from starting automatically at boot:
+
+```bash
+sudo systemctl disable wis2-daphne.service
+```
+
+**Note:** `disable` does not stop a currently running service. Use `stop` separately if needed.
+
+---
+
+### 7. After editing systemd files
+
+The standard sequence is:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart <service>
+sudo systemctl status <service>
+```
+
+For example:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart wis2-ingestion.service
+sudo systemctl status wis2-ingestion.service
+```
+
+### Quick reference
+
+| Action             | Command                                      |
+| ------------------ | -------------------------------------------- |
+| Start one          | `sudo systemctl start wis2-daphne.service`   |
+| Stop one           | `sudo systemctl stop wis2-daphne.service`    |
+| Restart one        | `sudo systemctl restart wis2-daphne.service` |
+| Status one         | `sudo systemctl status wis2-daphne.service`  |
+| Start everything   | `sudo systemctl start wis2.target`           |
+| Stop everything    | `sudo systemctl stop wis2.target`            |
+| Restart everything | `sudo systemctl restart wis2.target`         |
+| Status everything  | `sudo systemctl status wis2.target`          |
+| Reload systemd     | `sudo systemctl daemon-reload`               |
+| Enable at boot     | `sudo systemctl enable <service>`            |
+| Disable at boot    | `sudo systemctl disable <service>`           |
