@@ -1401,6 +1401,49 @@ class EmailSenderTest(SimpleTestCase):
 
     @patch('telemetry.email_sender.requests.post')
     @patch('django.core.mail.send_mail', side_effect=RuntimeError('smtp down'))
+    def test_send_oauth_string_error_surfaces_reason(self, mock_send_mail, mock_post):
+        token_resp = MagicMock(status_code=400)
+        token_resp.json.return_value = {
+            'error': 'invalid_grant',
+            'error_description': 'Token has been expired or revoked.',
+        }
+        mock_post.return_value = token_resp
+        with patch.dict(os.environ, self._gmail_env(), clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                email_sender_send('Sub', 'Body', 'to@example.com')
+        message = str(ctx.exception)
+        self.assertNotIn('has no attribute', message)
+        self.assertIn('400', message)
+        self.assertIn('invalid_grant', message)
+        self.assertIn('Token has been expired or revoked.', message)
+
+    def test_api_error_handles_dict_and_string_payloads(self):
+        dict_resp = MagicMock(status_code=403)
+        dict_resp.json.return_value = {'error': {'message': 'Daily limit exceeded'}}
+        dict_resp.text = '{"error":{"message":"Daily limit exceeded"}}'
+        rendered = email_sender_mod._api_error('send', dict_resp)
+        self.assertEqual(rendered, 'Gmail API error at send (403): Daily limit exceeded')
+
+        oauth_resp = MagicMock(status_code=400)
+        oauth_resp.json.return_value = {
+            'error': 'invalid_grant',
+            'error_description': 'Token has been expired or revoked.',
+        }
+        rendered = email_sender_mod._api_error('token', oauth_resp)
+        self.assertEqual(
+            rendered,
+            'Gmail API error at token (400): '
+            'invalid_grant — Token has been expired or revoked.',
+        )
+
+        non_json_resp = MagicMock(status_code=502)
+        non_json_resp.json.side_effect = ValueError('not json')
+        non_json_resp.text = '<html>Bad Gateway</html>'
+        rendered = email_sender_mod._api_error('send', non_json_resp)
+        self.assertEqual(rendered, 'Gmail API error at send (502): <html>Bad Gateway</html>')
+
+    @patch('telemetry.email_sender.requests.post')
+    @patch('django.core.mail.send_mail', side_effect=RuntimeError('smtp down'))
     def test_network_error_wraps_as_runtime_error(self, mock_send_mail, mock_post):
         mock_post.side_effect = requests.RequestException('connection timeout')
         with patch.dict(os.environ, self._gmail_env(), clear=False):

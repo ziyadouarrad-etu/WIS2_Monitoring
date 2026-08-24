@@ -35,7 +35,9 @@ def main():
     print(f"GMAIL_CLIENT_SECRET={creds.client_secret}")
     print(f"GMAIL_REFRESH_TOKEN={creds.refresh_token}")
     print("\nOptional: GMAIL_SENDER_EMAIL=<the account you authorized (defaults to SMTP_USER)>")
-    print("\nKeep these values secret. The refresh token never expires unless revoked.")
+    print("\nKeep these values secret. The refresh token is long-lived only if the "
+          "Google Cloud OAuth app's publishing status is 'In production'; apps in "
+          "'Testing' mode issue refresh tokens that expire after 7 days.")
 
 
 if __name__ == "__main__":

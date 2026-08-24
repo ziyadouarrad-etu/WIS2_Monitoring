@@ -51,8 +51,17 @@ def _build_raw_message(subject, body, to_email):
 
 def _api_error(step, resp):
     try:
-        detail = resp.json().get("error", {}).get("message") or resp.text
+        body = resp.json()
+        err = body.get("error")
     except ValueError:
+        body, err = {}, None
+    if isinstance(err, dict):
+        detail = err.get("message") or resp.text
+    elif isinstance(err, str):
+        # OAuth endpoints return {"error": "invalid_grant", "error_description": "..."}
+        desc = body.get("error_description")
+        detail = str(err) + (f" — {desc}" if desc else "")
+    else:
         detail = resp.text
     return f"Gmail API error at {step} ({resp.status_code}): {detail}"
 
