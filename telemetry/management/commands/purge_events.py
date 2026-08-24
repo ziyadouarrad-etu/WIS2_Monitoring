@@ -4,14 +4,14 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from telemetry.models import Alert, IncidentEvent, get_retention_days
+from telemetry.models import Event, IncidentActivity, get_retention_days
 
 BATCH_SIZE = 5000
 
 
 class Command(BaseCommand):
     help = (
-        "Delete alerts older than the configured retention period (AlertRetentionPolicy "
+        "Delete events older than the configured retention period (EventRetentionPolicy "
         "in the admin panel). No-op when the policy is unset or empty (persistence mode)."
     )
 
@@ -22,11 +22,11 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--dry-run', action='store_true',
-            help='Report how many alerts would be purged without deleting anything.',
+            help='Report how many events would be purged without deleting anything.',
         )
         parser.add_argument(
             '--limit', type=int, default=None,
-            help='Cap the total number of alerts purged in this run.',
+            help='Cap the total number of events purged in this run.',
         )
 
     def handle(self, *args, **options):
@@ -46,23 +46,23 @@ class Command(BaseCommand):
             return
 
         cutoff = timezone.now() - timedelta(days=days)
-        self.stdout.write(f'Retention: purging alerts ingested before {cutoff.isoformat()} '
+        self.stdout.write(f'Retention: purging events ingested before {cutoff.isoformat()} '
                           f'(older than {days} days).')
 
         if dry_run:
-            total = Alert.objects.filter(ingested_at__lt=cutoff).count()
+            total = Event.objects.filter(ingested_at__lt=cutoff).count()
             if limit is not None:
                 total = min(total, limit)
-            self.stdout.write(f'  would purge {total} alert(s) (dry-run)')
+            self.stdout.write(f'  would purge {total} event(s) (dry-run)')
             self.stdout.write(self.style.SUCCESS(
-                f'Done: {total} alert(s) would be purged (dry-run).'
+                f'Done: {total} event(s) would be purged (dry-run).'
             ))
             return
 
         purged = 0
         while limit is None or purged < limit:
             batch_ids = list(
-                Alert.objects.filter(ingested_at__lt=cutoff)
+                Event.objects.filter(ingested_at__lt=cutoff)
                 .values_list('id', flat=True)[:BATCH_SIZE]
             )
             if not batch_ids:
@@ -72,14 +72,14 @@ class Command(BaseCommand):
                 break
 
             with transaction.atomic():
-                IncidentEvent.objects.filter(alert_id__in=batch_ids).delete()
-                deleted, _ = Alert.objects.filter(id__in=batch_ids).delete()
+                IncidentActivity.objects.filter(event_id__in=batch_ids).delete()
+                deleted, _ = Event.objects.filter(id__in=batch_ids).delete()
             purged += deleted
-            self.stdout.write(f'  purged {deleted} alert(s)')
+            self.stdout.write(f'  purged {deleted} event(s)')
             if len(batch_ids) < BATCH_SIZE:
                 break
 
         if purged:
-            self.stdout.write(self.style.SUCCESS(f'Done: {purged} alert(s) purged.'))
+            self.stdout.write(self.style.SUCCESS(f'Done: {purged} event(s) purged.'))
         else:
-            self.stdout.write('No alerts to purge.')
+            self.stdout.write('No events to purge.')

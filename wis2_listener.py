@@ -15,8 +15,8 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-from telemetry.listeners import start_alert_listener
+from telemetry.listeners import start_event_listener
 
 
 if __name__ == "__main__":
-    start_alert_listener()
+    start_event_listener()

@@ -164,7 +164,7 @@ def parse_wmem_record(payload_json):
         specversion = payload_json.get("specversion", "1.0")
         event_type = payload_json.get("type", "UNKNOWN_TYPE")
         source = payload_json.get("source")
-        node = payload_json.get("subject", "UNKNOWN_NODE")
+        subject = payload_json.get("subject", "UNKNOWN_SUBJECT")
         event_time = payload_json.get("time")
         datacontenttype = payload_json.get("datacontenttype", "application/json")
         dataschema = payload_json.get("dataschema")
@@ -190,14 +190,14 @@ def parse_wmem_record(payload_json):
         # GENERATION DU INCIDENT HASH (Règle Métier)
         # ---------------------------------------------------------
         safe_title = title if title else "UNTITLED"
-        safe_node = node if node else "UNKNOWN_NODE"
-        hash_base = f"{safe_title}:{safe_node}"
+        safe_subject = subject if subject else "UNKNOWN_SUBJECT"
+        hash_base = f"{safe_title}:{safe_subject}"
 
         incident_hash = hashlib.sha256(hash_base.encode('utf-8')).hexdigest()
         # ---------------------------------------------------------
 
         return (
-            event_id, specversion, event_type, source, node, event_time,
+            event_id, specversion, event_type, source, subject, event_time,
             datacontenttype, dataschema,
             Json(conforms_to) if conforms_to else None,
             severity, subtype, channel, title, description,
@@ -250,7 +250,7 @@ def db_writer_worker():
         return
 
     insert_query = """
-                   INSERT INTO alerts (id, specversion, event_type, source, node, event_time, \
+                   INSERT INTO events (id, specversion, event_type, source, subject, event_time, \
                                                        datacontenttype, dataschema, conforms_to, severity, subtype, \
                                                        channel, \
                                                        title, description, display_title, \
@@ -278,12 +278,12 @@ def db_writer_worker():
                 for uid in uuids:
                     entry_len = len(uid) + 2 + (1 if chunk else 0)
                     if chunk and chunk_size + entry_len > NOTIFY_LIMIT:
-                        cursor.execute("SELECT pg_notify('wis2_alerts_updates', %s)", (json.dumps(chunk),))
+                        cursor.execute("SELECT pg_notify('wis2_events_updates', %s)", (json.dumps(chunk),))
                         chunk, chunk_size = [], 2
                     chunk.append(uid)
                     chunk_size += entry_len
                 if chunk:
-                    cursor.execute("SELECT pg_notify('wis2_alerts_updates', %s)", (json.dumps(chunk),))
+                    cursor.execute("SELECT pg_notify('wis2_events_updates', %s)", (json.dumps(chunk),))
                 conn.commit()
                 logger.info(f"Sync DB réussi: {len(batch)} logs insérés. (File d'attente: {telemetry_queue.qsize()})")
                 batch = []
@@ -299,17 +299,17 @@ def db_writer_worker():
                     conn.rollback()
                 except Exception:
                     pass
-                match = re.search(r'Key\s*\(node\)=\s*\(([^)]+)\)', str(e))
+                match = re.search(r'Key\s*\(subject\)=\s*\(([^)]+)\)', str(e))
                 if match:
-                    missing_node = match.group(1)
-                    logger.info(f"Noeud manquant détecté: '{missing_node}'. Ajout dans la table nodes...")
+                    missing_subject = match.group(1)
+                    logger.info(f"Sujet manquant détecté: '{missing_subject}'. Ajout dans la table subjects...")
                     try:
-                        cursor.execute("INSERT INTO nodes (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (missing_node,))
+                        cursor.execute("INSERT INTO subjects (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (missing_subject,))
                         conn.commit()
-                        logger.info(f"Noeud '{missing_node}' ajouté avec succès. Nouvelle tentative d'insertion du lot...")
+                        logger.info(f"Sujet '{missing_subject}' ajouté avec succès. Nouvelle tentative d'insertion du lot...")
                         continue
                     except Exception as insert_err:
-                        logger.error(f"Echec d'ajout du noeud '{missing_node}': {insert_err}")
+                        logger.error(f"Echec d'ajout du sujet '{missing_subject}': {insert_err}")
                         try:
                             conn.rollback()
                         except Exception:
@@ -317,7 +317,7 @@ def db_writer_worker():
                         batch = []
                         continue
                 else:
-                    logger.error(f"Impossible d'extraire le noeud manquant de l'erreur: {e}")
+                    logger.error(f"Impossible d'extraire le sujet manquant de l'erreur: {e}")
                     batch = []
                     continue
             except Exception as e:
@@ -373,12 +373,12 @@ def on_disconnect(client, userdata, flags, reason_code, properties):
 # =====================================================================
 # INITIALISATION
 # =====================================================================
-def start_ingestion_node():
+def start_ingestion_service():
     global SYSTEM_RUNNING
     threading.current_thread().name = "Main-MQTT"
 
     print("=" * 70)
-    print("   NOEUD DE TELEMETRIE WIS2 (MQTT -> POSTGRESQL)")
+    print("   SERVICE DE TELEMETRIE WIS2 (MQTT -> POSTGRESQL)")
     print("=" * 70)
 
     db_thread = threading.Thread(target=db_writer_worker, daemon=True)
@@ -402,11 +402,11 @@ def start_ingestion_node():
     )
 
     # Generate a dynamic 8-character hash for the client ID
-    unique_node_id = f"wis2-telemetry-node-{uuid.uuid4().hex[:8]}"
+    unique_client_id = f"wis2-telemetry-subject-{uuid.uuid4().hex[:8]}"
 
     client = mqtt.Client(
         callback_api_version=CallbackAPIVersion.VERSION2,
-        client_id=unique_node_id,
+        client_id=unique_client_id,
         transport=TRANSPORT_TYPE
     )
 
@@ -443,4 +443,4 @@ def start_ingestion_node():
 
 
 if __name__ == "__main__":
-    start_ingestion_node()
+    start_ingestion_service()

@@ -1,11 +1,11 @@
 {% if history_page_obj %}
 <div class="history-header">
-  <div class="section-label" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">Node History</div>
+  <div class="section-label" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">Subject History</div>
   <span class="history-count">{{ history_count }} total</span>
 </div>
 <div class="history-grid">
   {% for h in history_page_obj %}
-  <a href="{% url 'alert_detail' h.id %}" class="history-card">
+  <a href="{% url 'event_detail' h.id %}" class="history-card">
     <div class="history-card-inner">
       <span class="history-time">{{ h.event_time|date:"Y-m-d H:i" }}</span>
       <span class="history-sev history-sev-{{ h.severity|lower }}">{{ h.severity }}</span>

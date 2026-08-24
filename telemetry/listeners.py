@@ -10,11 +10,11 @@ from datetime import datetime, timezone, timedelta
 import psycopg2
 from channels.layers import get_channel_layer
 
-logger = logging.getLogger("WIS2_AlertListener")
+logger = logging.getLogger("WIS2_EventListener")
 _running = True
 
-ALERT_COLUMNS = (
-    'id', 'event_type', 'severity', 'source', 'node', 'title',
+EVENT_COLUMNS = (
+    'id', 'event_type', 'severity', 'source', 'subject', 'title',
     'display_title', 'description', 'event_time',
     'subtype', 'ingested_at', 'incident_hash',
     'channel', 'dataschema',
@@ -22,12 +22,12 @@ ALERT_COLUMNS = (
 
 
 def _hydrate_and_broadcast(conn, uuids, channel_layer, loop):
-    """Fetch full alert rows by UUID and broadcast to WebSocket clients."""
+    """Fetch full Event rows by UUID and broadcast to WebSocket clients."""
     cur = conn.cursor()
     try:
         if uuids:
             cur.execute(
-                f"SELECT {', '.join(ALERT_COLUMNS)} FROM alerts WHERE id = ANY(%s::uuid[]) ORDER BY ingested_at ASC",
+                f"SELECT {', '.join(EVENT_COLUMNS)} FROM events WHERE id = ANY(%s::uuid[]) ORDER BY ingested_at ASC",
                 (uuids,),
             )
         else:
@@ -36,16 +36,16 @@ def _hydrate_and_broadcast(conn, uuids, channel_layer, loop):
     finally:
         cur.close()
 
-    alerts = []
+    events = []
     for row in rows:
         ingested_at = row[10]
-        alerts.append({
+        events.append({
             'id': str(row[0]),
             'event_type': row[1],
             'severity': row[2],
             'source': row[3],
-            'node': str(row[4]) if row[4] else None,
-            'node_id': str(row[4]) if row[4] else None,
+            'subject': str(row[4]) if row[4] else None,
+            'subject_id': str(row[4]) if row[4] else None,
             'title': row[5],
             'display_title': row[6],
             'description': row[7],
@@ -57,21 +57,21 @@ def _hydrate_and_broadcast(conn, uuids, channel_layer, loop):
             'dataschema': row[13],
         })
 
-    if alerts:
+    if events:
         loop.run_until_complete(
-            channel_layer.group_send('alerts_live', {'type': 'new_alerts', 'alerts': alerts})
+            channel_layer.group_send('events_live', {'type': 'new_events', 'events': events})
         )
-        logger.info(f"Broadcast {len(alerts)} alerts to WebSocket clients")
+        logger.info(f"Broadcast {len(events)} events to WebSocket clients")
 
 
 def _catch_up_broadcast(conn, last_seen_at, channel_layer, loop):
-    """After reconnection, broadcast any alerts inserted during the offline window."""
+    """After reconnection, broadcast any events inserted during the offline window."""
     if last_seen_at is None:
         return
     cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT {', '.join(ALERT_COLUMNS)} FROM alerts WHERE ingested_at > %s ORDER BY ingested_at ASC LIMIT 500",
+            f"SELECT {', '.join(EVENT_COLUMNS)} FROM events WHERE ingested_at > %s ORDER BY ingested_at ASC LIMIT 500",
             (last_seen_at,),
         )
         rows = cur.fetchall()
@@ -83,10 +83,10 @@ def _catch_up_broadcast(conn, last_seen_at, channel_layer, loop):
 
     uuids = [str(row[0]) for row in rows]
     _hydrate_and_broadcast(conn, uuids, channel_layer, loop)
-    logger.info(f"Catch-up: broadcast {len(rows)} alerts missed during disconnection")
+    logger.info(f"Catch-up: broadcast {len(rows)} events missed during disconnection")
 
 
-def start_alert_listener():
+def start_event_listener():
     """Background thread: listens for PostgreSQL NOTIFY and broadcasts to WebSocket clients."""
     global _running
     _running = True
@@ -119,9 +119,9 @@ def start_alert_listener():
             conn = psycopg2.connect(**DB_CONFIG)
             conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             cur = conn.cursor()
-            cur.execute("LISTEN wis2_alerts_updates;")
+            cur.execute("LISTEN wis2_events_updates;")
             cur.close()
-            logger.info("Listening for wis2_alerts_updates notifications...")
+            logger.info("Listening for wis2_events_updates notifications...")
 
             _catch_up_broadcast(conn, last_seen_at, channel_layer, loop)
 
@@ -130,7 +130,7 @@ def start_alert_listener():
                 while conn.notifies:
                     notify = conn.notifies.pop(0)
                     try:
-                        if notify.channel == 'wis2_alerts_updates':
+                        if notify.channel == 'wis2_events_updates':
                             try:
                                 uuids = json.loads(notify.payload) if notify.payload else []
                             except (json.JSONDecodeError, TypeError):

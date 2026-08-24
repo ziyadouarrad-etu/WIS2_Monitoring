@@ -6,64 +6,64 @@ from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 
 
-class Node(models.Model):
+class Subject(models.Model):
     name = models.CharField(max_length=255, primary_key=True)
     responsibles = models.ManyToManyField(
-        'NodeResponsible',
-        through='NodeResponsibleMapping',
-        through_fields=('node', 'responsible'),
+        'SubjectResponsible',
+        through='SubjectResponsibleMapping',
+        through_fields=('subject', 'responsible'),
     )
 
     class Meta:
         managed = False
-        db_table = 'nodes'
+        db_table = 'subjects'
 
     def __str__(self):
         return self.name
 
 
-class NodeResponsible(models.Model):
+class SubjectResponsible(models.Model):
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True, db_column='created_at')
 
     class Meta:
         managed = False
-        db_table = 'node_responsibles'
+        db_table = 'subject_responsibles'
 
     def __str__(self):
         return self.name
 
 
-class NodeResponsibleMapping(models.Model):
+class SubjectResponsibleMapping(models.Model):
     id = models.AutoField(primary_key=True)
-    node = models.ForeignKey(
-        Node, on_delete=models.CASCADE,
-        db_column='node_name', to_field='name',
+    subject = models.ForeignKey(
+        Subject, on_delete=models.CASCADE,
+        db_column='subject_name', to_field='name',
     )
     responsible = models.ForeignKey(
-        NodeResponsible, on_delete=models.CASCADE,
+        SubjectResponsible, on_delete=models.CASCADE,
         db_column='responsible_id',
     )
     assigned_at = models.DateTimeField(auto_now_add=True, db_column='assigned_at')
 
     class Meta:
         managed = False
-        db_table = 'node_responsible_mapping'
-        unique_together = [('node', 'responsible')]
+        db_table = 'subject_responsible_mapping'
+        unique_together = [('subject', 'responsible')]
 
     def __str__(self):
-        return f"{self.node.name} - {self.responsible.name}"
+        return f"{self.subject.name} - {self.responsible.name}"
 
-class Alert(models.Model):
+class Event(models.Model):
     id = models.UUIDField(primary_key=True)
     specversion = models.CharField(max_length=10)
     event_type = models.CharField(max_length=255)
     source = models.CharField(max_length=255)
-    node = models.ForeignKey(
-        Node,
+    subject = models.ForeignKey(
+        Subject,
         on_delete=models.CASCADE,
-        db_column='node',
+        db_column='subject',
         to_field='name',
         db_index=True,
     )
@@ -88,15 +88,15 @@ class Alert(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'alerts'
+        db_table = 'events'
         ordering = ['-event_time']
 
     def __str__(self):
-        return f"[{self.severity}] {self.title or self.event_type} — {self.node}"
+        return f"[{self.severity}] {self.title or self.event_type} — {self.subject}"
 
 class Profile(models.Model):
     user = models.OneToOneField('auth.User', on_delete=models.CASCADE)
-    allowed_nodes = models.ManyToManyField(Node, blank=True)
+    allowed_subjects = models.ManyToManyField(Subject, blank=True)
 
     class Meta:
         managed = False
@@ -132,7 +132,7 @@ def sync_staff_on_group_change(sender, instance, action, **kwargs):
             User.objects.filter(pk__in=removed).update(is_staff=False, is_superuser=False)
 
 
-class IncidentEvent(models.Model):
+class IncidentActivity(models.Model):
     EVENT_TYPES = [
         ('comment', 'Comment'),
         ('email_sent', 'Email Sent'),
@@ -144,7 +144,7 @@ class IncidentEvent(models.Model):
         ('jira_ticket', 'Jira Ticket'),
     ]
     incident_hash = models.TextField(db_index=True)
-    alert = models.ForeignKey(Alert, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True, blank=True, db_column='event_id', db_constraint=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
     text = models.TextField(blank=True, default='')
@@ -153,7 +153,7 @@ class IncidentEvent(models.Model):
     active = models.BooleanField(default=True)
 
     class Meta:
-        db_table = 'incident_events'
+        db_table = 'incident_activities'
         ordering = ['created_at']
 
     def __str__(self):
@@ -173,23 +173,23 @@ class IncidentMute(models.Model):
         return f"{self.incident_hash} muted by {self.user.username} until {self.muted_until}"
 
 
-class AlertRetentionPolicy(models.Model):
+class EventRetentionPolicy(models.Model):
     ttl_active = models.BooleanField(
         default=False,
-        help_text="Enable the alert TTL. When disabled, alerts are kept forever.",
+        help_text="Enable the event TTL. When disabled, events are kept forever.",
     )
     retention_days = models.PositiveIntegerField(
         null=True,
         blank=True,
         validators=[MinValueValidator(1)],
-        help_text="Delete alerts older than this many days. Required when TTL is active.",
+        help_text="Delete events older than this many days. Required when TTL is active.",
     )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'alert_retention_policy'
-        verbose_name = 'alert retention policy'
-        verbose_name_plural = 'alert retention policy'
+        db_table = 'event_retention_policy'
+        verbose_name = 'event retention policy'
+        verbose_name_plural = 'event retention policy'
 
     def clean(self):
         if self.ttl_active and not self.retention_days:
@@ -199,8 +199,8 @@ class AlertRetentionPolicy(models.Model):
 
     def __str__(self):
         if self.ttl_active and self.retention_days:
-            return f"TTL active: delete alerts older than {self.retention_days} days"
-        return "TTL disabled: alerts are kept forever"
+            return f"TTL active: delete events older than {self.retention_days} days"
+        return "TTL disabled: events are kept forever"
 
     @classmethod
     def load(cls):
@@ -209,8 +209,8 @@ class AlertRetentionPolicy(models.Model):
 
 
 def get_retention_days():
-    """Return the configured alert TTL in days, or None when TTL is off (persistence)."""
-    obj = AlertRetentionPolicy.objects.first()
+    """Return the configured event TTL in days, or None when TTL is off (persistence)."""
+    obj = EventRetentionPolicy.objects.first()
     if obj is None or not obj.ttl_active or not obj.retention_days:
         return None
     return obj.retention_days

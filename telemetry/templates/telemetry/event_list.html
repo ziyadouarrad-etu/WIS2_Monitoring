@@ -5,10 +5,10 @@
 
 {% block header_subtitle %}Monitor{% endblock %}
 
-{% block find_alert %}
-<div class="find-alert" style="position:relative;">
-  <input type="text" id="findAlertInput" placeholder="Search alerts..." onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
-  <button class="fa-btn" onclick="findAlert()">Find</button>
+{% block find_event %}
+<div class="find-event" style="position:relative;">
+  <input type="text" id="findEventInput" placeholder="Search events..." onkeydown="if(event.key==='Enter')findEvent()" onfocus="var m=document.getElementById('findEventMsg');if(m)m.style.display='none'">
+  <button class="fa-btn" onclick="findEvent()">Find</button>
 </div>
 {% endblock %}
 
@@ -145,8 +145,8 @@ body::before {
 .sort-btn.sort-active { color: var(--accent); }
 .sort-divider { color: var(--border); margin: 0 2px; }
 .container { position: relative; z-index: 1; padding: 18px clamp(28px, 3vw, 64px) 40px; }
-.alerts { display: flex; flex-direction: column; gap: 5px; }
-.alert-row {
+.events { display: flex; flex-direction: column; gap: 5px; }
+.event-row {
   display: block;
   text-decoration: none;
   color: inherit;
@@ -156,27 +156,27 @@ body::before {
   transition: all 0.15s;
   position: relative;
 }
-.alert-row:hover {
+.event-row:hover {
   border-color: var(--border-hover);
   background: var(--bg-elevated);
   transform: translateX(2px);
 }
-.alert-row:active {
+.event-row:active {
   transform: translateX(2px) scale(0.995);
 }
-.alert-row.new {
+.event-row.new {
   animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
              highlightFadeCritical 5s ease-out forwards;
 }
-.alert-row.new.alert-error {
+.event-row.new.event-error {
   animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
              highlightFadeError 5s ease-out forwards;
 }
-.alert-row.new.alert-warning {
+.event-row.new.event-warning {
   animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
              highlightFadeWarning 5s ease-out forwards;
 }
-.alert-row.new.alert-info {
+.event-row.new.event-info {
   animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
              highlightFadeInfo 5s ease-out forwards;
 }
@@ -232,7 +232,7 @@ body::before {
     box-shadow: none;
   }
 }
-.alert-inner {
+.event-inner {
   display: grid;
   grid-template-columns: 1.5fr 0.8fr 1.2fr 1.2fr 2.5fr;
   gap: clamp(14px, 1.2vw, 24px);
@@ -241,10 +241,10 @@ body::before {
   border-radius: var(--radius);
   box-shadow: inset 3px 0 0 transparent;
 }
-.alert-critical .alert-inner { box-shadow: inset 3px 0 0 var(--critical); }
-.alert-error .alert-inner { box-shadow: inset 3px 0 0 var(--error); }
-.alert-warning .alert-inner { box-shadow: inset 3px 0 0 var(--warning); }
-.alert-info .alert-inner { box-shadow: inset 3px 0 0 var(--info); }
+.event-critical .event-inner { box-shadow: inset 3px 0 0 var(--critical); }
+.event-error .event-inner { box-shadow: inset 3px 0 0 var(--error); }
+.event-warning .event-inner { box-shadow: inset 3px 0 0 var(--warning); }
+.event-info .event-inner { box-shadow: inset 3px 0 0 var(--info); }
 .cell-time {
   font-family: var(--font-mono);
   font-size: clamp(14px, 1vw, 17px);
@@ -275,7 +275,7 @@ body::before {
   color: var(--text-secondary);
   word-break: break-all;
 }
-.cell-node {
+.cell-subject {
   font-family: var(--font-mono);
   font-size: clamp(14px, 1vw, 17px);
   color: var(--text-secondary);
@@ -361,9 +361,9 @@ body::before {
   min-width: 24px;
 }
 @media (max-width: 1000px) {
-  .alert-inner { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
-  .alert-inner .cell-time { grid-column: 1 / -1; }
-  .alert-inner .cell-title { grid-column: 1 / -1; }
+  .event-inner { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .event-inner .cell-time { grid-column: 1 / -1; }
+  .event-inner .cell-title { grid-column: 1 / -1; }
   .col-labels { display: none; }
 }
 @media (max-width: 640px) {
@@ -374,9 +374,9 @@ body::before {
   .filter-actions .btn,
   .filter-actions .clear { width: auto; }
   .filter-group { flex: 1 1 100%; }
-  .alert-inner { grid-template-columns: 1fr; gap: 5px; padding: 12px 14px; }
-  .alert-inner .cell-time { grid-column: 1; }
-  .alert-inner .cell-title { grid-column: 1; }
+  .event-inner { grid-template-columns: 1fr; gap: 5px; padding: 12px 14px; }
+  .event-inner .cell-time { grid-column: 1; }
+  .event-inner .cell-title { grid-column: 1; }
 }
 .msd-group { position: relative; flex: 1; min-width: 0; }
 .msd { position: relative; width: 100%; }
@@ -429,9 +429,9 @@ body::before {
 }
 .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
 @media (prefers-reduced-motion: reduce) {
-  .header::after, .alert-row.new, #new-alerts-banner .banner-dot { animation: none; }
+  .header::after, .event-row.new, #new-events-banner .banner-dot { animation: none; }
 }
-#new-alerts-banner {
+#new-events-banner {
   display: none;
   align-items: center;
   justify-content: center;
@@ -448,20 +448,20 @@ body::before {
   text-decoration: none;
   transition: background 0.15s, border-color 0.15s;
 }
-#new-alerts-banner:hover {
+#new-events-banner:hover {
   background: var(--accent);
   color: #06231f;
 }
-#new-alerts-banner.visible {
+#new-events-banner.visible {
   display: flex;
 }
-#new-alerts-banner .banner-dot {
+#new-events-banner .banner-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--accent);
   animation: bannerPulse 1.5s ease-in-out infinite;
 }
-#new-alerts-banner:hover .banner-dot {
+#new-events-banner:hover .banner-dot {
   background: #06231f;
 }
 @keyframes bannerPulse {
@@ -525,19 +525,19 @@ body::before {
           </div>
         </div>
       </div>
-      <div class="filter-group msd-group" data-name="node">
-        <label>Node</label>
+      <div class="filter-group msd-group" data-name="subject">
+        <label>Subject</label>
         <div class="msd">
           <button type="button" class="msd-trigger">
             <span class="msd-text">All</span>
             <span class="msd-arrow">&#9662;</span>
           </button>
           <div class="msd-panel">
-            <div class="msd-search"><input type="text" placeholder="Search nodes..."></div>
+            <div class="msd-search"><input type="text" placeholder="Search subjects..."></div>
             <div class="msd-options">
-              {% for n in node_choices %}
+              {% for n in subject_choices %}
               <label class="msd-option">
-                <input type="checkbox" name="node" value="{{ n }}" {% if n in current_nodes %}checked{% endif %}>
+                <input type="checkbox" name="subject" value="{{ n }}" {% if n in current_subjects %}checked{% endif %}>
                 <span>{{ n }}</span>
               </label>
               {% endfor %}
@@ -567,19 +567,19 @@ body::before {
           </div>
         </div>
       </div>
-      <div class="filter-group msd-group" data-name="alert">
-        <label>Alert</label>
+      <div class="filter-group msd-group" data-name="event">
+        <label>Event</label>
         <div class="msd">
           <button type="button" class="msd-trigger">
             <span class="msd-text">All</span>
             <span class="msd-arrow">&#9662;</span>
           </button>
           <div class="msd-panel">
-            <div class="msd-search"><input type="text" placeholder="Search alerts..."></div>
+            <div class="msd-search"><input type="text" placeholder="Search events..."></div>
             <div class="msd-options">
-              {% for a in alert_choices %}
+              {% for a in event_choices %}
               <label class="msd-option">
-                <input type="checkbox" name="alert" value="{{ a }}" {% if a in current_alerts %}checked{% endif %}>
+                <input type="checkbox" name="event" value="{{ a }}" {% if a in current_events %}checked{% endif %}>
                 <span>{{ a }}</span>
               </label>
               {% endfor %}
@@ -599,12 +599,12 @@ body::before {
     </div>
     <div class="filter-group">
       <label for="q">Keyword</label>
-      <input type="text" id="q" name="q" value="{{ current_q }}" placeholder="Search alerts...">
+      <input type="text" id="q" name="q" value="{{ current_q }}" placeholder="Search events...">
     </div>
     <div class="filter-actions">
       <button type="submit" class="btn">Filter</button>
-      {% if current_severities or current_nodes or current_types or current_alerts or current_sources or current_time_from or current_time_to or current_q %}
-        <a href="{% url 'monitor_alerts' %}" class="clear">Clear</a>
+      {% if current_severities or current_subjects or current_types or current_events or current_sources or current_time_from or current_time_to or current_q %}
+        <a href="{% url 'monitor_events' %}" class="clear">Clear</a>
       {% endif %}
     </div>
   </div>
@@ -612,7 +612,7 @@ body::before {
 </div>
 
 <div class="container">
-  {% if alerts %}
+  {% if events %}
   <div class="col-labels">
     <span>
       <span class="sort-btn {% if current_sort == 'event_time' %}sort-active{% endif %}" data-sort="event_time">Time (UTC)</span>
@@ -621,30 +621,30 @@ body::before {
     </span>
     <span>Severity</span>
     <span>Type</span>
-    <span>Node</span>
-    <span>Alert</span>
+    <span>Subject</span>
+    <span>Event</span>
   </div>
   {% endif %}
-  <a id="new-alerts-banner" href="?{% if base_query %}{{ base_query }}&{% endif %}page=1">
+  <a id="new-events-banner" href="?{% if base_query %}{{ base_query }}&{% endif %}page=1">
     <span class="banner-dot"></span>
-    <span id="banner-text">New alerts available</span>
+    <span id="banner-text">New events available</span>
   </a>
-  <div class="alerts" id="alert-list">
-    {% for a in alerts %}
-    <a href="{% url 'alert_detail' a.id %}" class="alert-row alert-{{ a.severity|lower }}" data-id="{{ a.id }}" data-event-time="{{ a.event_time|date:'c' }}" data-ingested-at="{{ a.ingested_at|date:'c' }}">
-      <div class="alert-inner">
+  <div class="events" id="event-list">
+    {% for a in events %}
+    <a href="{% url 'event_detail' a.id %}" class="event-row event-{{ a.severity|lower }}" data-id="{{ a.id }}" data-event-time="{{ a.event_time|date:'c' }}" data-ingested-at="{{ a.ingested_at|date:'c' }}">
+      <div class="event-inner">
         <div class="cell-time">{{ a.event_time|date:'Y-m-d H:i:s' }}</div>
         <div class="cell-sev cell-sev-{{ a.severity|lower }}">{{ a.severity }}</div>
         <div class="cell-type">{{ a.event_type|event_type_label|truncatechars:25 }}</div>
-        <div class="cell-node">{{ a.node_id|truncatechars:25 }}</div>
+        <div class="cell-subject">{{ a.subject_id|truncatechars:25 }}</div>
         <div class="cell-title">{% firstof a.display_title a.event_type|event_type_label %}{% if a.subtype %} <small>({{ a.subtype }})</small>{% endif %}</div>
       </div>
     </a>
     {% empty %}
     <div class="empty">
       <div class="empty-icon">&#9776;</div>
-      <h3>No alerts</h3>
-      <p>// no alerts match the current filters</p>
+      <h3>No events</h3>
+      <p>// no events match the current filters</p>
     </div>
     {% endfor %}
   </div>
@@ -739,19 +739,19 @@ document.querySelectorAll('.msd').forEach(function(msd) {
 
 
 (function() {
-  const list = document.getElementById('alert-list');
+  const list = document.getElementById('event-list');
   const currentSort = '{{ current_sort }}';
   const sortField = currentSort === 'ingested_at' ? 'ingestedAt' : 'eventTime';
   const apiSortField = currentSort === 'ingested_at' ? 'ingested_at' : 'event_time';
   let maxIngestedAt = '{{ latest_ingested_iso }}';
   const currentPage = {{ page_obj.number }};
-  const pendingAlerts = new Set();
-  const banner = document.getElementById('new-alerts-banner');
+  const pendingEvents = new Set();
+  const banner = document.getElementById('new-events-banner');
   const bannerText = document.getElementById('banner-text');
 
   function updateBanner() {
-    if (pendingAlerts.size > 0) {
-      bannerText.textContent = pendingAlerts.size + ' new alert' + (pendingAlerts.size > 1 ? 's' : '') + ' \u2014 click to view';
+    if (pendingEvents.size > 0) {
+      bannerText.textContent = pendingEvents.size + ' new event' + (pendingEvents.size > 1 ? 's' : '') + ' \u2014 click to view';
       banner.classList.add('visible');
     } else {
       banner.classList.remove('visible');
@@ -774,10 +774,10 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     return parts.length >= 2 ? parts.slice(-2).join(' ') : v;
   }
 
-  function alertMatchesKeyword(a, q) {
+  function eventMatchesKeyword(a, q) {
     q = String(q || '').toLowerCase();
     if (!q) return true;
-    var fields = [a.id, a.event_type, a.source, a.node, a.node_id, a.title, a.display_title, a.description, a.subtype, a.channel, a.dataschema, a.incident_hash];
+    var fields = [a.id, a.event_type, a.source, a.subject, a.subject_id, a.title, a.display_title, a.description, a.subtype, a.channel, a.dataschema, a.incident_hash];
     for (var i = 0; i < fields.length; i++) {
       if (fields[i] && String(fields[i]).toLowerCase().indexOf(q) !== -1) return true;
     }
@@ -786,20 +786,20 @@ document.querySelectorAll('.msd').forEach(function(msd) {
 
   function escHtml(s) { var d = document.createElement('div'); d.appendChild(document.createTextNode(s)); return d.innerHTML; }
 
-  function createAlertRow(a) {
+  function createEventRow(a) {
     const sev = a.severity.toLowerCase();
     const link = document.createElement('a');
-    link.href = '/alert/' + a.id + '/';
-    link.className = 'alert-row alert-' + sev + ' new';
+    link.href = '/event/' + a.id + '/';
+    link.className = 'event-row event-' + sev + ' new';
     link.dataset.id = a.id;
     link.dataset.eventTime = a.event_time;
     link.dataset.ingestedAt = a.ingested_at;
     link.innerHTML = `
-      <div class="alert-inner">
+      <div class="event-inner">
         <div class="cell-time">${escHtml(a.event_time.replace('T', ' ').substring(0, 19))}</div>
         <div class="cell-sev cell-sev-${escHtml(sev)}">${escHtml(a.severity)}</div>
         <div class="cell-type">${escHtml(eventTypeLabel(a.event_type||'').substring(0,25))}</div>
-              <div class="cell-node">${escHtml((a.node||'').substring(0,25))}</div>
+              <div class="cell-subject">${escHtml((a.subject||'').substring(0,25))}</div>
         <div class="cell-title">${escHtml(a.display_title || eventTypeLabel(a.event_type))}${a.subtype ? ' <small>('+escHtml(a.subtype)+')</small>' : ''}</div>
       </div>
     `;
@@ -807,7 +807,7 @@ document.querySelectorAll('.msd').forEach(function(msd) {
   }
 
   function insertSorted(link) {
-    const rows = list.querySelectorAll('.alert-row');
+    const rows = list.querySelectorAll('.event-row');
     let inserted = false;
     for (const row of rows) {
       if (row.dataset[sortField] < link.dataset[sortField]) {
@@ -825,14 +825,14 @@ document.querySelectorAll('.msd').forEach(function(msd) {
     var params = new URLSearchParams(window.location.search);
     var sev = params.getAll('severity');
     var typ = params.getAll('type');
-    var nd = params.getAll('node');
+    var nd = params.getAll('subject');
     var src = params.getAll('source');
-    var alrt = params.getAll('alert');
+    var alrt = params.getAll('event');
     if (sev.length && !sev.includes(a.severity)) return false;
     if (typ.length && !typ.includes(eventTypeLabel(a.event_type))) return false;
     var q = params.get('q');
-    if (q && !alertMatchesKeyword(a, q)) return false;
-    if (nd.length && !nd.includes(a.node)) return false;
+    if (q && !eventMatchesKeyword(a, q)) return false;
+    if (nd.length && !nd.includes(a.subject || a.subject_id)) return false;
     if (src.length && !src.includes(a.source)) return false;
     if (alrt.length && !alrt.includes(a.display_title)) return false;
     var tf = params.get('time_from');
@@ -844,7 +844,7 @@ document.querySelectorAll('.msd').forEach(function(msd) {
 
   (function() {
     var wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var wsUrl = wsProtocol + '//' + window.location.host + '/ws/alerts/';
+    var wsUrl = wsProtocol + '//' + window.location.host + '/ws/events/';
     var reconnectDelay = 1000;
 
     function connect() {
@@ -853,19 +853,19 @@ document.querySelectorAll('.msd').forEach(function(msd) {
       ws.onmessage = function(e) {
         try {
           var data = JSON.parse(e.data);
-          if (data.type !== 'new_alerts' || !data.alerts || data.alerts.length === 0) return;
+          if (data.type !== 'new_events' || !data.events || data.events.length === 0) return;
           var existingIds = new Set();
-          list.querySelectorAll('.alert-row').forEach(row => existingIds.add(row.dataset.id));
-          var filtered = data.alerts.filter(a => !existingIds.has(a.id) && matchesUrlFilters(a));
+          list.querySelectorAll('.event-row').forEach(row => existingIds.add(row.dataset.id));
+          var filtered = data.events.filter(a => !existingIds.has(a.id) && matchesUrlFilters(a));
           if (filtered.length === 0) return;
           var latest = filtered.reduce((a, b) => a.ingested_at > b.ingested_at ? a : b);
           if (latest.ingested_at > maxIngestedAt) maxIngestedAt = latest.ingested_at;
           if (currentPage > 1) {
-            filtered.forEach(a => pendingAlerts.add(a.id));
+            filtered.forEach(a => pendingEvents.add(a.id));
             updateBanner();
           } else {
             filtered.sort((a, b) => a[apiSortField].localeCompare(b[apiSortField]));
-            filtered.forEach(a => insertSorted(createAlertRow(a)));
+            filtered.forEach(a => insertSorted(createEventRow(a)));
           }
         } catch(err) { console.warn('WS error:', err); }
       };
@@ -882,26 +882,26 @@ document.querySelectorAll('.msd').forEach(function(msd) {
 })();
 
 function showToast(text) {
-  var old = document.getElementById('findAlertMsg');
+  var old = document.getElementById('findEventMsg');
   if (old) old.remove();
   var msg = document.createElement('div');
-  msg.id = 'findAlertMsg';
+  msg.id = 'findEventMsg';
   msg.textContent = text;
   msg.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:8px 16px;z-index:99999;font-family:var(--font-mono);font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);';
   document.body.appendChild(msg);
   setTimeout(function(){ msg.remove(); }, 2000);
 }
-function findAlert() {
-  var input = document.getElementById('findAlertInput');
+function findEvent() {
+  var input = document.getElementById('findEventInput');
   var kw = input.value.trim();
   if (!kw) return;
-  fetch('/api/alert-search/?q=' + encodeURIComponent(kw))
+  fetch('/api/event-search/?q=' + encodeURIComponent(kw))
     .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
     .then(function(data) {
-      if (data.found) { window.location = "{% url 'monitor_alerts' %}?q=" + encodeURIComponent(kw); }
-      else { showToast('No alerts match your search.'); }
+      if (data.found) { window.location = "{% url 'monitor_events' %}?q=" + encodeURIComponent(kw); }
+      else { showToast('No events match your search.'); }
     })
-    .catch(function(){ showToast('Could not check alert. Please try again.'); });
+    .catch(function(){ showToast('Could not check event. Please try again.'); });
 }
 </script>
 {% endblock %}

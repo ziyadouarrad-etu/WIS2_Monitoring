@@ -25,14 +25,14 @@ def _build_headers():
     }
 
 
-def build_summary(alert):
-    display = (alert.display_title or "").strip()
-    title = (alert.title or "").strip()
+def build_summary(Event):
+    display = (Event.display_title or "").strip()
+    title = (Event.title or "").strip()
 
     if display and title and display != title:
         return f"{display} | {title}"
 
-    return display or title or "Untitled Alert"
+    return display or title or "Untitled Event"
 
 
 GISC_TO_ASSIGNEE = {

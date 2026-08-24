@@ -192,6 +192,7 @@ EMAIL_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('SMTP_PORT', '587'))
 EMAIL_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() in ('true', '1', 'yes')
 EMAIL_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() in ('true', '1', 'yes')
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 EMAIL_HOST_USER = os.environ['SMTP_USER']
 EMAIL_HOST_PASSWORD = os.environ['SMTP_PASSWORD']
 DEFAULT_FROM_EMAIL = os.environ.get('SMTP_FROM', os.environ['SMTP_USER'])

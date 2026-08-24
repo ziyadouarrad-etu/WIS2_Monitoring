@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Incident {{ alert.id|truncatechars:10 }} - WIS2 Monitoring Events</title>
+<title>Incident {{ event.id|truncatechars:10 }} - WIS2 Monitoring Events</title>
 <link rel="stylesheet" href="{% static 'telemetry/fonts/fonts.css' %}">
 <style>
 :root {
@@ -135,20 +135,20 @@ body::after {
   align-items: center; gap: 4px; flex-shrink: 0;
 }
 .btn-back:hover { background: var(--accent); color: #06231f; box-shadow: 0 0 14px rgba(58,181,171,0.35); }
-.find-alert { display: flex; align-items: center; gap: 4px; }
-.find-alert input {
+.find-event { display: flex; align-items: center; gap: 4px; }
+.find-event input {
   font-family: var(--font-mono); font-size: 12px; padding: 4px 8px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
   color: var(--text); width: 130px; outline: none;
 }
-.find-alert input:focus { border-color: var(--accent); }
-.find-alert input::placeholder { color: var(--text-muted); }
-.find-alert .fa-btn {
+.find-event input:focus { border-color: var(--accent); }
+.find-event input::placeholder { color: var(--text-muted); }
+.find-event .fa-btn {
   font-family: var(--font-mono); font-size: 12px; font-weight: 600;
   padding: 4px 10px; background: transparent; border: 1px solid var(--accent);
   color: var(--accent); border-radius: 4px; cursor: pointer; transition: all 0.15s;
 }
-.find-alert .fa-btn:hover { background: var(--accent); color: #06231f; }
+.find-event .fa-btn:hover { background: var(--accent); color: #06231f; }
 .side-menu-overlay {
   display: none; position: fixed; inset: 0; z-index: 99990;
   background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
@@ -333,6 +333,16 @@ body::after {
   gap: 6px;
   margin-top: 6px;
 }
+.hero-time-line {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
 .hero-id-value {
   color: var(--accent);
   font-weight: 600;
@@ -429,6 +439,30 @@ body::after {
   border: 1px solid var(--border); border-radius: 4px; outline: none;
 }
 .jira-input:focus { border-color: var(--accent); }
+/* Explain chat modal */
+.explain-modal { width: 560px; }
+.explain-transcript {
+  max-height: 380px; overflow-y: auto; display: flex; flex-direction: column;
+  gap: 10px; padding-right: 4px; margin-bottom: 12px;
+}
+.ex-msg { display: flex; }
+.ex-user { justify-content: flex-end; }
+.ex-assistant { justify-content: flex-start; }
+.ex-bubble {
+  max-width: 85%; white-space: pre-wrap; word-wrap: break-word;
+  font-size: 13px; line-height: 1.5; padding: 9px 12px;
+  border-radius: 8px; border: 1px solid var(--border);
+}
+.ex-user .ex-bubble { background: var(--bg-elevated); color: var(--text); }
+.ex-assistant .ex-bubble { background: var(--bg); color: var(--text); }
+.ex-typing .ex-bubble::after {
+  content: '\2026'; animation: ex-blink 1s steps(3, end) infinite;
+}
+@keyframes ex-blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+.explain-error { margin-bottom: 12px; }
+.explain-input-row { display: flex; gap: 8px; align-items: flex-end; }
+.explain-input-row .email-textarea { flex: 1; min-height: 44px; }
+.explain-input-row .email-btn-send { flex-shrink: 0; height: 38px; }
 /* Email modal */
 .email-overlay {
   display: none; position: fixed; inset: 0; z-index: 99995;
@@ -516,6 +550,7 @@ body::after {
 }
 .email-status.error { display: block; background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical); }
 .email-status.success { display: block; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+.email-status[hidden] { display: none !important; }
 /* Raw JSON button */
 .raw-btn {
   font-family: var(--font-mono); font-size: 12px; font-weight: 600;
@@ -656,7 +691,7 @@ body::after {
   background: rgba(255,255,255,0.10);
 }
 .tab-btn.active .tab-count { background: rgba(18,23,30,0.25); }
-.tab-count-alert { background: var(--critical); color: #160b0b; }
+.tab-count-event { background: var(--critical); color: #160b0b; }
 
 .tab-pane { display: none; }
 .tab-pane.active {
@@ -772,7 +807,7 @@ body::after {
 .kpi-grade-a { border-top-color: var(--success); color: var(--success); }
 .kpi-grade-b { border-top-color: var(--accent); color: var(--accent); }
 .kpi-grade-c { border-top-color: var(--warning); color: var(--warning); }
-.kpi-grade-d { border-top-color: var(--critical); color: var(--critical); }
+.kpi-grade-d { border-top-color: var(--error); color: var(--error); }
 .kpi-grade-f { border-top-color: var(--critical); color: var(--critical); }
 .kpi-grade-label {
   font-family: var(--font-mono);
@@ -1713,10 +1748,10 @@ body::after {
   </div>
   <div class="header-right">
     <a href="{% url 'dashboard' %}" class="nav-link">Dashboard</a>
-    <a href="{% url 'monitor_alerts' %}" class="nav-link">Monitor Alerts</a>
-    <div class="find-alert" style="position:relative;">
-      <input type="text" id="findAlertInput" placeholder="Search alerts..." onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
-      <button class="fa-btn" onclick="findAlert()">Find</button>
+    <a href="{% url 'monitor_events' %}" class="nav-link">Monitor Events</a>
+    <div class="find-event" style="position:relative;">
+      <input type="text" id="findEventInput" placeholder="Search events..." onkeydown="if(event.key==='Enter')findEvent()" onfocus="var m=document.getElementById('findEventMsg');if(m)m.style.display='none'">
+      <button class="fa-btn" onclick="findEvent()">Find</button>
     </div>
     <button type="button" class="menu-btn" id="menuBtn" aria-label="Menu">&#9776;</button>
   </div>
@@ -1772,55 +1807,62 @@ body::after {
 <div id="notes-banner" class="notes-banner" style="display:none"></div>
 
 <div class="container">
-  <div class="card hero-card hero-card-{{ alert.severity|lower }}">
+  <div class="card hero-card hero-card-{{ event.severity|lower }}">
     <div class="card-body">
       <button type="button" class="raw-btn" id="rawJsonBtn">&#123;&#125; See Full Raw JSON</button>
       <div class="hero">
-        <div class="hero-rail hero-rail-{{ alert.severity|lower }}"></div>
+        <div class="hero-rail hero-rail-{{ event.severity|lower }}"></div>
         <div class="hero-body">
           <div class="hero-top">
-            <span class="hero-sev-pill hero-sev-pill-{{ alert.severity|lower }}">{{ alert.severity }}</span>
+            <span class="hero-sev-pill hero-sev-pill-{{ event.severity|lower }}">{{ event.severity }}</span>
           </div>
-          <div class="hero-title">{{ alert.display_title|default:alert.title|default:"Untitled Alert" }}</div>
+          <div class="hero-title">{{ event.display_title|default:event.title|default:"Untitled Event" }}</div>
           <div class="hero-byline">
             <span class="hero-label">Title:</span>
-            <span class="hero-value">{{ alert.title|default:"Untitled Alert" }}</span>
+            <span class="hero-value">{{ event.title|default:"Untitled Event" }}</span>
           </div>
           <div class="hero-id-line">
             <span class="hero-label">ID:</span>
-            <span class="hero-id-value" data-full="{{ alert.id }}">{{ alert.id }}</span>
+            <span class="hero-id-value" data-full="{{ event.id }}">{{ event.id }}</span>
             <span class="id-copy-feedback">Copied!</span>
           </div>
+          {% if event.event_time or event.ingested_at %}
+          <div class="hero-time-line">
+            <span><span class="hero-label">Event Time:</span> {{ event.event_time|date:"Y-m-d H:i:s" }} UTC</span>
+            <span><span class="hero-label">Received at:</span> {{ event.ingested_at|date:"Y-m-d H:i:s" }} UTC</span>
+          </div>
+          {% endif %}
 
           <div class="meta-grid">
             <div class="meta-item">
-              <span class="meta-label">Node</span>
-              <span class="meta-value">{{ alert.node|default:"&mdash;" }}</span>
+              <span class="meta-label">Subject</span>
+              <span class="meta-value">{{ event.subject|default:"&mdash;" }}</span>
             </div>
             <div class="meta-item">
               <span class="meta-label">Source</span>
-              <span class="meta-value">{{ alert.source }}</span>
+              <span class="meta-value">{{ event.source }}</span>
             </div>
             <div class="meta-item">
               <span class="meta-label">Type</span>
-              <span class="meta-value">{{ alert.event_type|event_type_label }}</span>
+              <span class="meta-value">{{ event.event_type|event_type_label }}</span>
             </div>
-            {% if alert.subtype %}
+            {% if event.subtype %}
             <div class="meta-item">
               <span class="meta-label">Subtype</span>
-              <span class="meta-value">{{ alert.subtype }}</span>
+              <span class="meta-value">{{ event.subtype }}</span>
             </div>
             {% endif %}
-            {% if alert.channel %}
+            {% if event.channel %}
             <div class="meta-item">
               <span class="meta-label">Channel</span>
-              <span class="meta-value">{{ alert.channel }}</span>
+              <span class="meta-value">{{ event.channel }}</span>
             </div>
             {% endif %}
           </div>
 
           <button type="button" class="email-btn" id="emailBtn">&#9993; Send Email</button>
           <button type="button" class="email-btn" id="jiraBtn"{% if not jira_configured %} title="Jira not configured" disabled{% endif %}>Create Jira Ticket</button>
+          <button type="button" class="email-btn" id="explainBtn"{% if not llm_configured %} title="Ollama not configured" disabled{% endif %}>Explain Event</button>
         </div>
       </div>
     </div>
@@ -1833,11 +1875,11 @@ body::after {
       <button type="button" class="email-modal-close" id="emailModalClose">&times;</button>
     </div>
     <div class="email-modal-body">
-      {% if node_responsibles %}
+      {% if subject_responsibles %}
       <div class="email-field">
         <label class="email-label">Responsible</label>
         <div class="email-resp-list" id="emailRespList">
-          {% for r in node_responsibles %}
+          {% for r in subject_responsibles %}
           <div class="email-resp-item">
             <input type="checkbox" id="resp_{{ r.id }}" value="{{ r.id }}" checked>
             <label for="resp_{{ r.id }}">{{ r.name }} <span class="resp-email">&lt;{{ r.email }}&gt;</span></label>
@@ -1850,12 +1892,12 @@ body::after {
         <textarea id="emailNote" class="email-textarea" rows="4" placeholder="Add a note for the recipients..."></textarea>
       </div>
       {% else %}
-      <div class="email-no-responsibles">This node has no responsible. Please contact the administrator.</div>
+      <div class="email-no-responsibles">This subject has no responsible. Please contact the administrator.</div>
       {% endif %}
     </div>
     <div class="email-modal-footer">
       <button type="button" class="email-btn-cancel" id="emailCancel">Cancel</button>
-      {% if node_responsibles %}
+      {% if subject_responsibles %}
       <button type="button" class="email-btn-send" id="emailSendBtn">Send Email</button>
       {% endif %}
     </div>
@@ -1892,12 +1934,28 @@ body::after {
     </div>
   </div>
 
-  {{ raw_json|json_script:"alert-raw-json" }}
+  <div class="email-overlay" id="explainOverlay"></div>
+  <div class="email-modal explain-modal" id="explainModal">
+    <div class="email-modal-header">
+      <span>Event Explanation</span>
+      <button type="button" class="email-modal-close" id="explainModalClose">&times;</button>
+    </div>
+    <div class="email-modal-body">
+      <div class="explain-transcript" id="explainTranscript"></div>
+      <div class="email-status error" id="explainErrorBanner" hidden></div>
+      <div class="explain-input-row">
+        <textarea id="explainInput" class="email-textarea" rows="2" placeholder="Ask a follow-up question... (Enter to send)"></textarea>
+        <button type="button" class="email-btn-send" id="explainSendBtn">Send</button>
+      </div>
+    </div>
+  </div>
+
+  {{ raw_json|json_script:"event-raw-json" }}
 
   <div class="rawjson-overlay" id="rawJsonOverlay"></div>
   <div class="rawjson-modal" id="rawJsonModal">
     <div class="rawjson-modal-header">
-      <span>Raw Alert JSON</span>
+      <span>Raw Event JSON</span>
       <button type="button" class="rawjson-modal-close" id="rawJsonClose">&times;</button>
     </div>
     <div class="rawjson-modal-body">
@@ -1910,16 +1968,16 @@ body::after {
     </div>
   </div>
 
-  {% if alert.description %}
+  {% if event.description %}
   <div class="card">
     <div class="card-body">
       <div class="section-label">Description</div>
-      <div class="desc-text">{{ alert.description }}</div>
+      <div class="desc-text">{{ event.description }}</div>
     </div>
   </div>
   {% endif %}
 
-  {% if ets_tests or kpi_tests or summary_dict or alert.wnm or alert.errors %}
+  {% if ets_tests or kpi_tests or summary_dict or event.wnm or event.errors %}
   <div class="card">
     <div class="tabs-header" id="tabs-header">
       {% if ets_tests %}
@@ -1937,13 +1995,13 @@ body::after {
       {% if summary_dict and not is_kpi_report %}
       <button class="tab-btn" data-tab="summary">Summary</button>
       {% endif %}
-      {% if alert.wnm %}
+      {% if event.wnm %}
       <button class="tab-btn" data-tab="wnm">WNM</button>
       {% endif %}
-      {% if alert.errors %}
+      {% if event.errors %}
       <button class="tab-btn" data-tab="errors">
         Errors
-        <span class="tab-count tab-count-alert">!</span>
+        <span class="tab-count tab-count-event">!</span>
       </button>
       {% endif %}
     </div>
@@ -2048,15 +2106,15 @@ body::after {
       </div>
       {% endif %}
 
-      {% if alert.wnm %}
+      {% if event.wnm %}
       <div class="tab-pane" id="tab-wnm">
-        {{ alert.wnm|render_wnm }}
+        {{ event.wnm|render_wnm }}
       </div>
       {% endif %}
 
-      {% if alert.errors %}
+      {% if event.errors %}
       <div class="tab-pane" id="tab-errors">
-        {{ alert.errors|render_errors }}
+        {{ event.errors|render_errors }}
       </div>
       {% endif %}
     </div>
@@ -2224,18 +2282,20 @@ body::after {
         setButtonLoading(sendBtn, 'Sending\u2026');
         var oldStatus = modal.querySelector('.email-status');
         if (oldStatus) oldStatus.remove();
-        fetch('{% url "email_responsible" alert.id %}', {
+        fetch('{% url "email_responsible" event.id %}', {
           method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
           body: JSON.stringify({responsible_ids: ids, note: note ? note.value : ''})
         }).then(function(r){
-          if (r.ok) {
+          return r.json().then(function(data){ return {ok: r.ok, data: data}; });
+        }).then(function(res){
+          if (res.ok && res.data.success) {
             location.reload();
           } else {
             clearButtonLoading(sendBtn);
             var s = document.createElement('div');
             s.className = 'email-status error';
-            s.textContent = 'Failed to send email.';
+            s.textContent = res.data.error || 'Failed to send email.';
             modal.querySelector('.email-modal-body').prepend(s);
           }
         })['catch'](function(){
@@ -2287,7 +2347,7 @@ body::after {
         setButtonLoading(createBtn, 'Creating\u2026');
         var old = modal.querySelector('.email-status');
         if (old) old.remove();
-        fetch('{% url "create_jira_ticket" alert.id %}', {
+        fetch('{% url "create_jira_ticket" event.id %}', {
           method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
           body: JSON.stringify({summary: summary, description: descInput ? descInput.value : '', assignee: assignee})
@@ -2308,11 +2368,115 @@ body::after {
     }
   })();
 
+  /* explain event chat */
+  (function(){
+    var btn = document.getElementById('explainBtn');
+    if (!btn || btn.disabled) return;
+    var modal = document.getElementById('explainModal');
+    var overlay = document.getElementById('explainOverlay');
+    var closeBtn = document.getElementById('explainModalClose');
+    var transcript = document.getElementById('explainTranscript');
+    var input = document.getElementById('explainInput');
+    var sendBtn = document.getElementById('explainSendBtn');
+    var errorBanner = document.getElementById('explainErrorBanner');
+    var history = [];
+    var busy = false;
+    var started = false;
+
+    function openModal() {
+      modal.classList.add('open');
+      overlay.classList.add('open');
+      if (!started) { started = true; ask(null); }
+    }
+    function closeModal() {
+      modal.classList.remove('open');
+      overlay.classList.remove('open');
+    }
+    function showError(text) {
+      errorBanner.textContent = text;
+      errorBanner.hidden = false;
+    }
+    function clearError() { errorBanner.hidden = true; }
+
+    function addBubble(role, text) {
+      var wrap = document.createElement('div');
+      wrap.className = 'ex-msg ex-' + role;
+      var bubble = document.createElement('div');
+      bubble.className = 'ex-bubble';
+      bubble.textContent = text;
+      wrap.appendChild(bubble);
+      transcript.appendChild(wrap);
+      transcript.scrollTop = transcript.scrollHeight;
+      return bubble;
+    }
+
+    function setBusy(on, pendingBubble) {
+      busy = on;
+      sendBtn.disabled = on;
+      input.disabled = on;
+      sendBtn.textContent = on ? 'Thinking\u2026' : 'Send';
+      if (on && pendingBubble) pendingBubble.parentElement.classList.add('ex-typing');
+    }
+
+    function ask(message) {
+      if (busy) return;
+      clearError();
+      if (message) {
+        addBubble('user', message);
+        input.value = '';
+      }
+      var pending = addBubble('assistant', '');
+      setBusy(true, pending);
+      var body = {history: history};
+      if (message) body.message = message;
+      fetch('{% url "event_explain" event.id %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+        body: JSON.stringify(body)
+      }).then(function(r){
+        return r.json().then(function(data){ return {ok: r.ok, data: data}; });
+      }).then(function(res){
+        setBusy(false);
+        pending.parentElement.classList.remove('ex-typing');
+        pending.textContent = '';
+        if (res.ok && res.data.success) {
+          if (message) history.push({role: 'user', content: message});
+          history.push({role: 'assistant', content: res.data.reply});
+          pending.textContent = res.data.reply;
+          transcript.scrollTop = transcript.scrollHeight;
+        } else {
+          pending.parentElement.remove();
+          showError(res.data.error || 'The assistant is unavailable right now.');
+        }
+      })['catch'](function(){
+        setBusy(false);
+        pending.parentElement.remove();
+        showError('Network error.');
+      });
+    }
+
+    btn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', closeModal);
+    sendBtn.addEventListener('click', function(){
+      var text = input.value.trim();
+      if (!text || busy) return;
+      ask(text);
+    });
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        var text = input.value.trim();
+        if (text && !busy) ask(text);
+      }
+    });
+  })();
+
   })();
 
   /* raw JSON modal */
   (function(){
-    var rawScript = document.getElementById('alert-raw-json');
+    var rawScript = document.getElementById('event-raw-json');
     var rawData = {};
     if (rawScript) {
       try { rawData = JSON.parse(rawScript.textContent); } catch (e) { rawData = {}; }
@@ -2419,36 +2583,36 @@ body::after {
   })();
 
   function showToast(text) {
-    var old = document.getElementById('findAlertMsg');
+    var old = document.getElementById('findEventMsg');
     if (old) old.remove();
     var msg = document.createElement('div');
-    msg.id = 'findAlertMsg';
+    msg.id = 'findEventMsg';
     msg.textContent = text;
     msg.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:8px 16px;z-index:99999;font-family:var(--font-mono);font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);';
     document.body.appendChild(msg);
     setTimeout(function(){ msg.remove(); }, 2000);
   }
-  function findAlert() {
-    var input = document.getElementById('findAlertInput');
+  function findEvent() {
+    var input = document.getElementById('findEventInput');
     var kw = input.value.trim();
     if (!kw) return;
-    fetch('/api/alert-search/?q=' + encodeURIComponent(kw))
+    fetch('/api/event-search/?q=' + encodeURIComponent(kw))
       .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
       .then(function(data) {
-        if (data.found) { window.location = "{% url 'monitor_alerts' %}?q=" + encodeURIComponent(kw); }
-        else { showToast('No alerts match your search.'); }
+        if (data.found) { window.location = "{% url 'monitor_events' %}?q=" + encodeURIComponent(kw); }
+        else { showToast('No events match your search.'); }
       })
-      .catch(function(){ showToast('Could not check alert. Please try again.'); });
+      .catch(function(){ showToast('Could not check event. Please try again.'); });
   }
 
   /* --- Activity / Incident Collaboration --- */
-  var activityAlertId = '{{ alert.id }}';
+  var activityEventId = '{{ event.id }}';
   var isNoteMode = false;
   var activityOffset = 0;
   var activityLimit = 10;
 
   function fetchActivity() {
-    fetch('/alert/' + activityAlertId + '/activity/?offset=' + activityOffset + '&limit=' + activityLimit)
+    fetch('/event/' + activityEventId + '/activity/?offset=' + activityOffset + '&limit=' + activityLimit)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         renderNotes(data.notes);
@@ -2549,7 +2713,7 @@ body::after {
     var muteBtn = document.getElementById('muteBtn');
     var isMuted = muteBtn.style.display === 'none';
     if (isMuted) {
-      fetch('/alert/' + activityAlertId + '/unmute/', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
+      fetch('/event/' + activityEventId + '/unmute/', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
         .then(function(r) { return r.json(); })
         .then(function() { fetchActivity(); });
     } else {
@@ -2557,7 +2721,7 @@ body::after {
       if (!d) return;
       var duration = parseInt(d, 10);
       if (isNaN(duration) || duration < 1) return;
-      fetch('/alert/' + activityAlertId + '/mute/', {
+      fetch('/event/' + activityEventId + '/mute/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
         body: JSON.stringify({duration: duration * 3600})
@@ -2590,10 +2754,10 @@ body::after {
     var url, body;
     if (isNoteMode) {
       var duration = document.getElementById('noteDuration').value;
-      url = '/alert/' + activityAlertId + '/note/';
+      url = '/event/' + activityEventId + '/note/';
       body = JSON.stringify({text: text, duration: duration});
     } else {
-      url = '/alert/' + activityAlertId + '/comment/';
+      url = '/event/' + activityEventId + '/comment/';
       body = JSON.stringify({text: text});
     }
     var btn = document.getElementById('commentSubmitBtn');
@@ -2618,7 +2782,7 @@ body::after {
   }
 
   function dismissNote(noteId) {
-    fetch('/alert/' + activityAlertId + '/note/' + noteId + '/remove/', {
+    fetch('/event/' + activityEventId + '/note/' + noteId + '/remove/', {
       method: 'POST',
       headers: {'X-CSRFToken': '{{ csrf_token }}'}
     }).then(function(r) {
@@ -2640,13 +2804,13 @@ body::after {
   (function(){
     var container = document.getElementById('historyContainer');
     if (!container) return;
-    var alertId = '{{ alert.id }}';
+    var eventId = '{{ event.id }}';
     container.addEventListener('click', function(e) {
       var link = e.target.closest('.history-page-link[data-page]');
       if (!link) return;
       e.preventDefault();
       var page = link.getAttribute('data-page');
-      fetch('/api/alert/' + alertId + '/history/?history_page=' + page)
+      fetch('/api/event/' + eventId + '/history/?history_page=' + page)
         .then(function(r) { return r.text(); })
         .then(function(html) {
           container.innerHTML = html;

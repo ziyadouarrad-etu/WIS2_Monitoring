@@ -6,16 +6,16 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta
 from .models import (
-    Profile, NodeResponsible, NodeResponsibleMapping, Node,
-    AlertRetentionPolicy, Alert,
+    Profile, SubjectResponsible, SubjectResponsibleMapping, Subject,
+    EventRetentionPolicy, Event,
 )
 
 
 class ProfileInline(admin.StackedInline):
     model = Profile
-    filter_horizontal = ('allowed_nodes',)
+    filter_horizontal = ('allowed_subjects',)
     max_num = 1
-    fields = ('allowed_nodes',)
+    fields = ('allowed_subjects',)
 
     def get_extra(self, request, obj=None, **kwargs):
         return 0 if obj else 1
@@ -48,29 +48,29 @@ admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
 
-class NodeResponsibleMappingInline(admin.TabularInline):
-    model = NodeResponsibleMapping
+class SubjectResponsibleMappingInline(admin.TabularInline):
+    model = SubjectResponsibleMapping
     extra = 1
 
 
-@admin.register(NodeResponsible)
-class NodeResponsibleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'assigned_nodes', 'created_at')
+@admin.register(SubjectResponsible)
+class SubjectResponsibleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'email', 'assigned_subjects', 'created_at')
     search_fields = ('name', 'email')
-    inlines = [NodeResponsibleMappingInline]
+    inlines = [SubjectResponsibleMappingInline]
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related('noderesponsiblemapping_set__node')
+        return super().get_queryset(request).prefetch_related('subjectresponsiblemapping_set__subject')
 
-    def assigned_nodes(self, obj):
-        mappings = obj.noderesponsiblemapping_set.all()
-        return ", ".join(m.node.name for m in mappings)
-    assigned_nodes.short_description = 'Assigned Nodes'
+    def assigned_subjects(self, obj):
+        mappings = obj.subjectresponsiblemapping_set.all()
+        return ", ".join(m.subject.name for m in mappings)
+    assigned_subjects.short_description = 'Assigned Subjects'
 
 
-class AlertRetentionPolicyForm(forms.ModelForm):
+class EventRetentionPolicyForm(forms.ModelForm):
     class Meta:
-        model = AlertRetentionPolicy
+        model = EventRetentionPolicy
         fields = ('ttl_active', 'retention_days')
 
     def clean(self):
@@ -80,25 +80,25 @@ class AlertRetentionPolicyForm(forms.ModelForm):
         return data
 
 
-@admin.register(AlertRetentionPolicy)
-class AlertRetentionPolicyAdmin(admin.ModelAdmin):
-    form = AlertRetentionPolicyForm
+@admin.register(EventRetentionPolicy)
+class EventRetentionPolicyAdmin(admin.ModelAdmin):
+    form = EventRetentionPolicyForm
     list_display = ('ttl_active', 'retention_days', 'impact_preview', 'updated_at')
     fields = ('ttl_active', 'retention_days', 'impact_preview', 'updated_at')
     readonly_fields = ('impact_preview', 'updated_at')
 
     def has_add_permission(self, request):
-        return not AlertRetentionPolicy.objects.exists()
+        return not EventRetentionPolicy.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False
 
     def impact_preview(self, obj):
         if not obj or not obj.ttl_active:
-            return 'TTL disabled: alerts are kept forever'
+            return 'TTL disabled: events are kept forever'
         if not obj.retention_days:
             return 'TTL active but no retention days set'
         cutoff = timezone.now() - timedelta(days=obj.retention_days)
-        count = Alert.objects.filter(ingested_at__lt=cutoff).count()
-        return f"Would purge ~{count:,} alert(s) older than {obj.retention_days} days (ingested before {cutoff:%Y-%m-%d %H:%M})"
+        count = Event.objects.filter(ingested_at__lt=cutoff).count()
+        return f"Would purge ~{count:,} event(s) older than {obj.retention_days} days (ingested before {cutoff:%Y-%m-%d %H:%M})"
     impact_preview.short_description = 'Impact preview'

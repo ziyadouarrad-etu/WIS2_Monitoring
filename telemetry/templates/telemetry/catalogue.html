@@ -69,7 +69,7 @@
 
 {% block content %}
 <div class="doc-wrap">
-  <h1>WIS2 Alert Documentation</h1>
+  <h1>WIS2 Event Documentation</h1>
   <p>A reference for the WIS2 Monitoring Events (WME) framework covering infrastructure diagnostics, schema validation, systemic telemetry, and response strategies.</p>
 
   <div class="doc-toc">
@@ -85,10 +85,10 @@
       <li><a href="#sec6">6. Schema Validation</a></li>
       <li><a href="#sec7">7. Systemic Telemetry</a></li>
       <li><a href="#sec8">8. Response Framework</a></li>
-      <li><a href="#alert-fields">Core Alert Fields</a></li>
-      <li><a href="#alert-ids">Identifiers</a></li>
-      <li><a href="#alert-meta">Metadata Fields</a></li>
-      <li><a href="#alert-content">Content Fields</a></li>
+      <li><a href="#event-fields">Core Event Fields</a></li>
+      <li><a href="#event-ids">Identifiers</a></li>
+      <li><a href="#event-meta">Metadata Fields</a></li>
+      <li><a href="#event-content">Content Fields</a></li>
       <li><a href="#wnm">WNM Payload</a></li>
       <li><a href="#errors">Errors</a></li>
       <li><a href="#tests">Tests (ETS)</a></li>
@@ -96,7 +96,7 @@
       <li><a href="#links">Links</a></li>
       <li><a href="#incidents">Incidents</a></li>
       <li><a href="#display-titles">Display Titles</a></li>
-      <li><a href="#nodes">Nodes &amp; Sources</a></li>
+      <li><a href="#subjects">Subjects &amp; Sources</a></li>
       <li><a href="#sources">Sources</a></li>
     </ul>
   </div>
@@ -110,7 +110,7 @@
     <p>Core infrastructure components — <strong>Global Brokers</strong> (message routing), <strong>Global Caches</strong> (payload hosting), and <strong>Global Discovery Catalogues</strong> (metadata querying) — form a synergistic network that enables real-time diagnostic telemetry.</p>
     <div class="doc-callout a">
       <div class="doc-callout-title">Performance Mandates</div>
-      <p>Global Brokers must achieve <strong>99.5% availability</strong>, process <strong>10,000+ messages/sec</strong>, and support <strong>hundreds of concurrent WIS2 Nodes</strong>.</p>
+      <p>Global Brokers must achieve <strong>99.5% availability</strong>, process <strong>10,000+ messages/sec</strong>, and support <strong>hundreds of concurrent WIS2 Subjects</strong>.</p>
     </div>
     <p>The WME specification uses CloudEvents encoded in JSON, broadcast on <code>monitor/a/wis2/#</code>. Agents subscribe to channels like <code>monitor/a/wis2/+</code> (all centers) or <code>monitor/a/wis2/ca-eccc-msc/#</code> (center-specific).</p>
   </div>
@@ -127,7 +127,7 @@
         <tr><td><code>id</code></td><td>UUIDv4</td><td>Unique event identifier. Prevents collision and enables chronological tracing.</td></tr>
         <tr><td><code>type</code></td><td>String (Reverse DNS)</td><td>Nature of the anomaly (e.g. <code>int.wmo.wis.wme.event.wcmp2.ets</code>).</td></tr>
         <tr><td><code>source</code></td><td>String</td><td>The monitoring service that detected the anomaly.</td></tr>
-        <tr><td><code>subject</code></td><td>String</td><td>The failing or notifying entity (the node being observed).</td></tr>
+        <tr><td><code>subject</code></td><td>String</td><td>The failing or notifying entity (the subject being observed).</td></tr>
         <tr><td><code>data.severity</code></td><td>Enum</td><td><code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>, <code>CRITICAL</code>.</td></tr>
         <tr><td><code>data.content</code></td><td>Object</td><td>Human-readable diagnostic summaries.</td></tr>
         <tr><td><code>data.links</code></td><td>Array</td><td>Machine-actionable endpoints for related resources.</td></tr>
@@ -151,7 +151,7 @@
         <tr>
           <td><span class="sev sev-e">ERROR</span></td>
           <td>Isolated failure — WNM schema failure, HTTP 403/502, missing metadata, connection refused.</td>
-          <td>Quarantine payload, suspend fetching, alert provider, require schema correction.</td>
+          <td>Quarantine payload, suspend fetching, event provider, require schema correction.</td>
         </tr>
         <tr>
           <td><span class="sev sev-w">WARNING</span></td>
@@ -190,8 +190,8 @@
   <!-- 3. BROKER DISCONNECTIONS -->
   <!-- ============================== -->
   <div class="doc-section" id="sec3">
-    <h2>3. Node Connectivity &amp; Broker Disconnections</h2>
-    <p>Nodes must maintain continuous MQTT connections to multiple Global Brokers. Redundant mesh ensures WNMs route through alternative paths during localized outages.</p>
+    <h2>3. Subject Connectivity &amp; Broker Disconnections</h2>
+    <p>Subjects must maintain continuous MQTT connections to multiple Global Brokers. Redundant mesh ensures WNMs route through alternative paths during localized outages.</p>
     <table class="doc-table">
       <thead><tr><th>Event</th><th>Severity</th><th>Type</th><th>Impact</th></tr></thead>
       <tbody>
@@ -213,13 +213,13 @@
     <p><strong>Trigger:</strong> Simultaneous drops across two or more (but not all) brokers.</p>
     <p><strong>Causes:</strong> Regional backhaul outages, BGP route flapping, message queue client resource starvation.</p>
     <p><strong>Impact:</strong> Increased latency, close to total blackout.</p>
-    <p><strong>Response:</strong> Escalate to Node operator's network team — inspect edge router stability, CPU utilization.</p>
+      <p><strong>Response:</strong> Escalate to Subject operator's network team — inspect edge router stability, CPU utilization.</p>
 
     <h3>3.2 Total Isolation</h3>
     <h4>Disconnected from all brokers — <span class="sev sev-c">CRITICAL</span></h4>
     <p><strong>Trigger:</strong> Absolute silence — zero active MQTT connections.</p>
     <p><strong>Causes:</strong> Facility power loss, ISP isolation, TLS certificate expiration, messaging software crash.</p>
-    <p><strong>Impact:</strong> No WNMs published — the Node's real-time contribution is erased.</p>
+    <p><strong>Impact:</strong> No WNMs published — the Subject's real-time contribution is erased.</p>
     <p><strong>Response:</strong> Out-of-band communication, emergency restarts, physical connectivity verification.</p>
 
     <h4>Target is down — <span class="sev sev-c">CRITICAL</span></h4>
@@ -234,7 +234,7 @@
   <!-- ============================== -->
   <div class="doc-section" id="sec4">
     <h2>4. Global Cache &amp; Data Flow Disruptions</h2>
-    <p>Global Caches download payloads from origin Nodes and serve end-users, shielding origin Nodes from bandwidth overload. Cache anomalies mean data is announced but physically unobtainable.</p>
+    <p>Global Caches download payloads from origin Subjects and serve end-users, shielding origin Subjects from bandwidth overload. Cache anomalies mean data is announced but physically unobtainable.</p>
     <table class="doc-table">
       <thead><tr><th>Event</th><th>Severity</th><th>Type</th><th>Impact</th></tr></thead>
       <tbody>
@@ -352,7 +352,7 @@
     <p>A holistic observability framework tracks not just failures but also administrative events and theoretical architectural threats.</p>
 
     <h3>7.1 Scheduled Maintenance</h3>
-    <p><strong>Example alerts:</strong> "A scheduled maintenance service for CMA Global Monitor"</p>
+    <p><strong>Example events:</strong> "A scheduled maintenance service for CMA Global Monitor"</p>
     <p>Often flagged <span class="sev sev-c">CRITICAL</span> because they indicate planned unavailability of a core component.</p>
     <p><strong>Event type:</strong> <code>int.wmo.wis.wme.event.notice</code></p>
     <p><strong>Causes:</strong> SSL rotations, infrastructure migrations, hardware upgrades, software transitions.</p>
@@ -361,16 +361,16 @@
     <h3>7.2 Anti-Loop Detection</h3>
     <p>Brokers subscribe to each other for redundancy. This introduces infinite message loop risk.</p>
     <div class="doc-callout c">
-      <div class="doc-callout-title">Theorized Alert: Anti-Loop Threshold Exceeded</div>
+      <div class="doc-callout-title">Theorized Event: Anti-Loop Threshold Exceeded</div>
       <p><strong>Severity:</strong> <span class="sev sev-w">WARNING</span> / <span class="sev sev-e">ERROR</span></p>
       <p><strong>Trigger:</strong> Duplicate detection flags high rate of identical UUIDs within sub-second window.</p>
       <p><strong>Impact if unchecked:</strong> Exponential bandwidth consumption, broker CPU exhaustion, PubSub mesh crash.</p>
-      <p><strong>Response:</strong> Immediately quarantine the offending Node's topic stream.</p>
+      <p><strong>Response:</strong> Immediately quarantine the offending Subject's topic stream.</p>
     </div>
 
     <h3>7.3 GDC Metadata Latency</h3>
     <div class="doc-callout w">
-      <div class="doc-callout-title">Theorized Alert: GDC Metadata Archive Stale (&gt;24h)</div>
+      <div class="doc-callout-title">Theorized Event: GDC Metadata Archive Stale (&gt;24h)</div>
       <p><strong>Severity:</strong> <span class="sev sev-w">WARNING</span> / <span class="sev sev-e">ERROR</span></p>
       <p><strong>Trigger:</strong> GDC's harvester fails to update its index for a full day.</p>
       <p><strong>Causes:</strong> Database locking, silent harvester crashes.</p>
@@ -384,10 +384,10 @@
       <li><strong>Sensor Centre Global Cache (SCGC)</strong></li>
       <li><strong>Sensor Centre Global Discovery Catalogue (SCGDC)</strong></li>
     </ul>
-    <p>Generate WME alerts when operational KPIs and SLAs are breached.</p>
+    <p>Generate WME events when operational KPIs and SLAs are breached.</p>
     <div class="doc-callout c">
       <div class="doc-callout-title">Example: Global Broker KPI Breach</div>
-      <p>If a Global Broker fails to process <strong>10,000 messages/sec</strong> or exceeds <strong>1,000 active connections</strong> without scaling, the Sensor Centre generates a <span class="sev sev-c">CRITICAL</span> WME alert independently.</p>
+      <p>If a Global Broker fails to process <strong>10,000 messages/sec</strong> or exceeds <strong>1,000 active connections</strong> without scaling, the Sensor Centre generates a <span class="sev sev-c">CRITICAL</span> WME event independently.</p>
     </div>
     <p>Regional authorities can deploy bespoke Sensor Centres to validate local regulatory compliance (GBON/RBON data flow).</p>
   </div>
@@ -416,7 +416,7 @@
         <tr>
           <td><span class="sev sev-e">ERROR</span></td>
           <td>Isolated failure — schema failure, 403, missing metadata.</td>
-          <td>Quarantine payload, suspend fetching, alert provider.</td>
+          <td>Quarantine payload, suspend fetching, event provider.</td>
           <td>Manual correction (<code>check-jsonschema</code>) or WAF whitelisting.</td>
         </tr>
         <tr>
@@ -435,19 +435,19 @@
   <div class="doc-section" id="conclusion">
     <h2>9. Conclusion</h2>
     <p>The WME framework represents a CloudEvents-driven observability layer indispensable for WIS2 scalability. The transition from static file transfers to asynchronous PubSub introduces complexity — while it decouples producers and consumers, it introduces risk of silent localized failures cascading into global data blackouts.</p>
-    <p>WME alerts provide granular diagnostics from physical infrastructure failures to deep-packet JSON schema inspections. The WMO's Sensor Centres and automated ETS ensure continuous objective auditing of both network uptime and the integrity, compliance, and scientific discoverability of meteorological data itself.</p>
+    <p>WME events provide granular diagnostics from physical infrastructure failures to deep-packet JSON schema inspections. The WMO's Sensor Centres and automated ETS ensure continuous objective auditing of both network uptime and the integrity, compliance, and scientific discoverability of meteorological data itself.</p>
   </div>
 
   <!-- ============================== -->
-  <!-- CORE ALERT FIELDS -->
+  <!-- CORE EVENT FIELDS -->
   <!-- ============================== -->
-  <div class="doc-section" id="alert-fields">
-    <h2>Core Alert Fields</h2>
-    <p>These fields appear on every alert record.</p>
-    <div class="field-card"><div class="field-name">id</div><div class="field-type">UUID (Primary Key)</div><div class="field-desc">Unique identifier. Links alerts across the platform.</div></div>
+  <div class="doc-section" id="event-fields">
+    <h2>Core Event Fields</h2>
+    <p>These fields appear on every event record.</p>
+    <div class="field-card"><div class="field-name">id</div><div class="field-type">UUID (Primary Key)</div><div class="field-desc">Unique identifier. Links events across the platform.</div></div>
     <div class="field-card"><div class="field-name">severity</div><div class="field-type">String — CRITICAL | ERROR | WARNING | INFO</div><div class="field-desc">Urgency level. Determines UI color coding and issue priority.</div></div>
     <div class="field-card"><div class="field-name">event_type</div><div class="field-type">String (URI)</div><div class="field-desc">WME event type URI. Displayed as last two segments (e.g. <code>wme event</code>).</div></div>
-    <div class="field-card"><div class="field-name">title</div><div class="field-type">Text (nullable)</div><div class="field-desc">Original alert title from WME content payload.</div></div>
+    <div class="field-card"><div class="field-name">title</div><div class="field-type">Text (nullable)</div><div class="field-desc">Original event title from WME content payload.</div></div>
     <div class="field-card"><div class="field-name">description</div><div class="field-type">Text (nullable)</div><div class="field-desc">Full text description. May contain error messages, stack traces, diagnostics.</div></div>
     <div class="field-card"><div class="field-name">event_time</div><div class="field-type">DateTime (UTC)</div><div class="field-desc">When the WIS2 event occurred. Primary sort timestamp.</div></div>
     <div class="field-card"><div class="field-name">ingested_at</div><div class="field-type">DateTime (auto-set)</div><div class="field-desc">Timestamp when ingested into the local database. Used for default sort and live-feed polling.</div></div>
@@ -456,19 +456,19 @@
   <!-- ============================== -->
   <!-- IDENTIFIERS -->
   <!-- ============================== -->
-  <div class="doc-section" id="alert-ids">
+  <div class="doc-section" id="event-ids">
     <h2>Identifiers &amp; Classification</h2>
-    <div class="field-card"><div class="field-name">node</div><div class="field-type">String (FK to nodes table)</div><div class="field-desc">WIS2 Centre from the WME <code>subject</code> field (e.g. <code>uk-metoffice-wmc</code>). Used for filtering and RBAC.</div></div>
-    <div class="field-card"><div class="field-name">source</div><div class="field-type">String</div><div class="field-desc">Monitoring service that generated the alert. The source is the observer, the node is the observed.</div></div>
+    <div class="field-card"><div class="field-name">subject</div><div class="field-type">String (FK to subjects table)</div><div class="field-desc">WIS2 Centre from the WME <code>subject</code> field (e.g. <code>uk-metoffice-wmc</code>). Used for filtering and RBAC.</div></div>
+    <div class="field-card"><div class="field-name">source</div><div class="field-type">String</div><div class="field-desc">Monitoring service that generated the event. The source is the observer, the subject is the observed.</div></div>
     <div class="field-card"><div class="field-name">display_title</div><div class="field-type">Text (computed)</div><div class="field-desc">Clean human-readable title computed during ingestion.</div></div>
-    <div class="field-card"><div class="field-name">subtype</div><div class="field-type">String (nullable)</div><div class="field-desc">Optional sub-classification. Only observed value: <code>gm-alert</code>.</div></div>
+    <div class="field-card"><div class="field-name">subtype</div><div class="field-type">String (nullable)</div><div class="field-desc">Optional sub-classification. Only observed value: <code>gm-event</code>.</div></div>
     <div class="field-card"><div class="field-name">channel</div><div class="field-type">Text (nullable)</div><div class="field-desc">WIS2 data channel of origin (e.g. <code>origin/a/wis2/de-dwd/data/core</code>).</div></div>
   </div>
 
   <!-- ============================== -->
   <!-- METADATA FIELDS -->
   <!-- ============================== -->
-  <div class="doc-section" id="alert-meta">
+  <div class="doc-section" id="event-meta">
     <h2>Metadata Fields</h2>
     <div class="field-card"><div class="field-name">specversion</div><div class="field-type">String (max 10 chars)</div><div class="field-desc">WIS2 specification version (e.g. <code>1.0</code>).</div></div>
     <div class="field-card"><div class="field-name">datacontenttype</div><div class="field-type">String</div><div class="field-desc">MIME type of data payload (e.g. <code>application/json</code>).</div></div>
@@ -479,14 +479,14 @@
   <!-- ============================== -->
   <!-- CONTENT FIELDS -->
   <!-- ============================== -->
-  <div class="doc-section" id="alert-content">
+  <div class="doc-section" id="event-content">
     <h2>Content Fields</h2>
     <div class="field-card"><div class="field-name">wnm</div><div class="field-type">JSON Object (nullable)</div><div class="field-desc">WNM payload — GeoJSON Feature object containing notification details.</div></div>
     <div class="field-card"><div class="field-name">errors</div><div class="field-type">JSON Array (nullable)</div><div class="field-desc">Error objects or strings describing technical failures.</div></div>
     <div class="field-card"><div class="field-name">tests</div><div class="field-type">JSON Array (nullable)</div><div class="field-desc">ETS test results. Each entry has id, status, and message.</div></div>
     <div class="field-card"><div class="field-name">summary</div><div class="field-type">JSON Object (nullable)</div><div class="field-desc">Aggregated test result counts (PASSED, FAILED, SKIPPED, WARNING).</div></div>
     <div class="field-card"><div class="field-name">links</div><div class="field-type">JSON Array (nullable)</div><div class="field-desc">Link objects referencing related resources.</div></div>
-    <div class="field-card"><div class="field-name">incident_hash</div><div class="field-type">Text (computed)</div><div class="field-desc">SHA-256 of <code>"{title}:{node}"</code>. Groups alerts into incidents.</div></div>
+    <div class="field-card"><div class="field-name">incident_hash</div><div class="field-type">Text (computed)</div><div class="field-desc">SHA-256 of <code>"{title}:{subject}"</code>. Groups events into incidents.</div></div>
   </div>
 
   <!-- ============================== -->
@@ -585,21 +585,21 @@
   <!-- ============================== -->
   <div class="doc-section" id="incidents">
     <h2>Incidents</h2>
-    <p>Related alerts are grouped into incidents for collaborative tracking.</p>
+    <p>Related events are grouped into incidents for collaborative tracking.</p>
     <div class="doc-callout a">
       <div class="doc-callout-title">How Incidents Are Grouped</div>
-      <p><code>SHA-256("{title}:{node}")</code> — alerts with the same title and node share the same incident hash.</p>
+      <p><code>SHA-256("{title}:{subject}")</code> — events with the same title and subject share the same incident hash.</p>
     </div>
     <table class="doc-table">
       <thead><tr><th>Feature</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><strong>Node History</strong></td><td>Detail page shows all other alerts for the same node.</td></tr>
+        <tr><td><strong>Subject History</strong></td><td>Detail page shows all other events for the same subject.</td></tr>
         <tr><td><strong>Muting</strong></td><td>Hide an incident for 5 min to 7 days (per user).</td></tr>
         <tr><td><strong>Comments</strong></td><td>Visible in activity timeline.</td></tr>
         <tr><td><strong>Pinned Notes</strong></td><td>Timed banner at top of detail page.</td></tr>
         <tr><td><strong>Activity Timeline</strong></td><td>Chronological log: comments, emails, notes, muting, views.</td></tr>
-        <tr><td><strong>Email Responsible</strong></td><td>Send email to node's responsible person from detail page.</td></tr>
-        <tr><td><strong>Create Jira Ticket</strong></td><td>Create a Jira issue from the detail page (summary = display_title + title when different, description = alert description).</td></tr>
+        <tr><td><strong>Email Responsible</strong></td><td>Send email to subject's responsible person from detail page.</td></tr>
+        <tr><td><strong>Create Jira Ticket</strong></td><td>Create a Jira issue from the detail page (summary = display_title + title when different, description = event description).</td></tr>
       </tbody>
     </table>
     <table class="doc-table">
@@ -607,7 +607,7 @@
       <tbody>
         <tr><td><code>comment</code></td><td>User added a comment.</td></tr>
         <tr><td><code>email_sent</code></td><td>Email sent to responsible.</td></tr>
-        <tr><td><code>jira_ticket</code></td><td>Jira ticket created from alert.</td></tr>
+        <tr><td><code>jira_ticket</code></td><td>Jira ticket created from event.</td></tr>
         <tr><td><code>note_added</code></td><td>Pinned note added with expiry.</td></tr>
         <tr><td><code>note_removed</code></td><td>Note deactivated early.</td></tr>
         <tr><td><code>muted</code></td><td>Incident muted for a duration.</td></tr>
@@ -651,16 +651,16 @@
   </div>
 
   <!-- ============================== -->
-  <!-- NODES & SOURCES -->
+  <!-- SUBJECTS & SOURCES -->
   <!-- ============================== -->
-  <div class="doc-section" id="nodes">
-    <h2>Nodes &amp; Sources</h2>
+  <div class="doc-section" id="subjects">
+    <h2>Subjects &amp; Sources</h2>
     <div class="doc-callout a">
-      <div class="doc-callout-title">Node vs Source</div>
-      <p><strong>Node</strong> = the Centre being monitored. <strong>Source</strong> = the monitoring service that detected the issue.</p>
+      <div class="doc-callout-title">Subject vs Source</div>
+      <p><strong>Subject</strong> = the Centre being monitored. <strong>Source</strong> = the monitoring service that detected the issue.</p>
     </div>
-    <p><strong>Node:</strong> <code>nodes.name</code> (String, PK) — auto-created during ingestion.</p>
-    <p><strong>Responsible Persons:</strong> <code>node_responsibles</code> — name + email. Used for alert notification emails.</p>
+    <p><strong>Subject:</strong> <code>subjects.name</code> (String, PK) — auto-created during ingestion.</p>
+    <p><strong>Responsible Persons:</strong> <code>subject_responsibles</code> — name + email. Used for event notification emails.</p>
   </div>
 
   <!-- ============================== -->
@@ -672,7 +672,7 @@
       <li><span class="source-num">[1]</span> <strong>WMO WIS2 Monitoring Events</strong> — <a href="https://wmo-im.github.io/wis2-monitoring-events/standard/wis2-monitoring-events-DRAFT.html" target="_blank">wmo-im.github.io/wis2-monitoring-events</a></li>
       <li><span class="source-num">[2]</span> <strong>GB functions and MQTT messages</strong> — <a href="https://www.wis-jma.go.jp/cms/gisc_tokyo/workshop/file/2025/JMA-WS2025_item11_GB%20functions%20and%20MQTT%20messages.pdf" target="_blank">wis-jma.go.jp</a></li>
       <li><span class="source-num">[3]</span> <strong>Update WIS2 Guide Part III — Sensor Centre extensibility</strong> — <a href="https://github.com/wmo-im/et-w2it/issues/40" target="_blank">github.com/wmo-im/et-w2it</a></li>
-      <li><span class="source-num">[4]</span> <strong>Internal Alerts Dataset</strong> — Empirical telemetry from active WIS2 environments</li>
+      <li><span class="source-num">[4]</span> <strong>Internal Events Dataset</strong> — Empirical telemetry from active WIS2 environments</li>
       <li><span class="source-num">[5]</span> <strong>WIS2 Cookbook</strong> — <a href="https://wmo-im.github.io/wis2-cookbook/cookbook/wis2-cookbook-DRAFT.html" target="_blank">wmo-im.github.io/wis2-cookbook</a></li>
     </ul>
   </div>

@@ -2,8 +2,8 @@
 -- RECOMPUTE display_title FOR ALL ALERTS (BACKFILL)
 -- =====================================================================
 -- Replicates telemetry/_compute_display_title() (wis2_ingestion.py) for
--- every row in the `alerts` table so existing records get the same
--- categorized titles as newly-ingested alerts.
+-- every row in the `events` table so existing records get the same
+-- categorized titles as newly-ingested events.
 --
 -- How to run (on the server, against the wis2_alerts database):
 --     psql -h <DB_HOST> -U <DB_USER> -d wis2_alerts -f scripts/recompute_display_titles.sql
@@ -60,7 +60,7 @@
 --          WHEN COALESCE(a.title,'') LIKE 'Target %' AND COALESCE(a.title,'') LIKE '% is down%' THEN 'Target is down'
 --          WHEN COALESCE(a.description,'') <> '' AND REGEXP_REPLACE(COALESCE(a.description,''), ',collection time .*$', '') = '' THEN 'Unknown Error: no details'
 --          ELSE COALESCE(a.title,'') END AS new_title
--- FROM alerts a
+-- FROM events a
 -- WHERE a.display_title IS DISTINCT FROM (
 --        CASE
 --          WHEN COALESCE(a.title,'') LIKE '%Template:%' THEN 'Maintenance'
@@ -98,7 +98,7 @@
 -- ---------------------------------------------------------------------
 -- 2) THE BACKFILL UPDATE
 -- ---------------------------------------------------------------------
-UPDATE alerts AS a
+UPDATE events AS a
 SET display_title = c.new_title
 FROM (
     SELECT id,
@@ -146,7 +146,7 @@ FROM (
         END AS new_title
     FROM (
         SELECT id, COALESCE(title, '') AS t, COALESCE(description, '') AS d
-        FROM alerts
+        FROM events
     ) AS base
 ) AS c
 WHERE a.id = c.id

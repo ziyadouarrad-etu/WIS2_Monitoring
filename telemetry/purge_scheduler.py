@@ -1,4 +1,4 @@
-"""Nightly alert-purge scheduler, hosted inside the ingestion process.
+"""Nightly Event-purge scheduler, hosted inside the ingestion process.
 
 Kept in its own module with no import-time side effects so it can be unit
 tested without the MQTT/DB environment variables that wis2_ingestion.py
@@ -39,12 +39,12 @@ def sleep_until(target, stop_fn=None, chunk_secs=60):
 
 
 def run_purge(logger=None):
-    """Execute the purge_alerts management command, never raising."""
+    """Execute the purge_events management command, never raising."""
     logger = logger or PURGE_SCHEDULER_LOGGER
     try:
         close_old_connections()
         out = StringIO()
-        call_command('purge_alerts', stdout=out)
+        call_command('purge_events', stdout=out)
         lines = [ln.strip() for ln in out.getvalue().splitlines() if ln.strip()]
         logger.info('Nightly purge: ' + ' | '.join(lines))
         return True
@@ -70,7 +70,7 @@ def purge_scheduler_worker(stop_fn=None, logger=None, hour=3, on_startup=False):
         target = next_purge_target(now, hour=hour)
         wait_secs = max(0, int((target - timezone.now()).total_seconds()))
         logger.info(
-            'Next alert purge at %s (in %dh %dm).',
+            'Next Event purge at %s (in %dh %dm).',
             target.isoformat(), wait_secs // 3600, (wait_secs % 3600) // 60,
         )
         sleep_until(target, stop_fn)

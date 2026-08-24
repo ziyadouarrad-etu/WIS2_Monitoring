@@ -1,6 +1,6 @@
 # WIS2 Monitoring Events
 
-Real-time alert monitoring system for the **WMO Information System 2 (WIS2)** global infrastructure. Ingests WIS2 Notification Messages (WNMs) from the global MQTT broker, stores them in PostgreSQL, and streams them to a web dashboard via WebSockets.
+Real-time event monitoring system for the **WMO Information System 2 (WIS2)** global infrastructure. Ingests WIS2 Notification Messages (WNMs) from the global MQTT broker, stores them in PostgreSQL, and streams them to a web dashboard via WebSockets.
 
 ## Architecture
 
@@ -21,17 +21,17 @@ Real-time alert monitoring system for the **WMO Information System 2 (WIS2)** gl
                ▼
 ┌─────────────────────────────┐
 │  PostgreSQL                 │  Database: wis2_alerts
-│  - alerts table             │  Channel: wis2_alerts_updates
-│  - nodes table              │
+│  - events table             │  Channel: wis2_events_updates
+│  - subjects table           │
 └───────┬──────────┬──────────┘
         │          │
-        │          ▼  LISTEN wis2_alerts_updates
+        │          ▼  LISTEN wis2_events_updates
         │  ┌───────────────────────┐
         │  │ telemetry/listeners.py│  Standalone process (wis2_listener.py)
         │  │ - Receives NOTIFY     │  Fetches full rows by UUID
-        │  │ - Hydrates alerts     │  Broadcasts via channel_layer.group_send()
+        │  │ - Hydrates events     │  Broadcasts via channel_layer.group_send()
         │  └──────────┬────────────┘
-        │             │ group_send('alerts_live')
+        │             │ group_send('events_live')
         │             ▼
         │  ┌───────────────────────┐
         │  │ channels_postgres     │  PostgresChannelLayer (NOTIFY/LISTEN)
@@ -40,17 +40,17 @@ Real-time alert monitoring system for the **WMO Information System 2 (WIS2)** gl
         │             │
         │             ▼
         │  ┌───────────────────────┐
-        │  │ telemetry/consumers.py│  AlertConsumer (WebSocket)
+        │  │ telemetry/consumers.py│  EventConsumer (WebSocket)
         │  │ - RBAC filtering      │  Pushes to connected clients
-        │  │ - admin sees all      │
-        │  │ - users see own nodes │
+         │  │ - admin sees all      │
+         │  │ - users see own subjects │
         │  └──────────┬────────────┘
         │             │
         ▼             ▼
 ┌─────────────────────────────┐
 │  Django (Daphne ASGI)       │  HTTP + WebSocket
-│  /                          │  Dashboard, alerts, incident mgmt
-│  /ws/alerts/                │  Live WebSocket stream
+│  /                          │  Dashboard, events, incident mgmt
+│  /ws/events/                │  Live WebSocket stream
 └─────────────────────────────┘
 ```
 
@@ -60,26 +60,26 @@ Real-time alert monitoring system for the **WMO Information System 2 (WIS2)** gl
 
 - Connects to WIS2 Global Broker via MQTT/WebSocket with TLS
 - Subscribes to `monitor/a/wis2/#` (all WIS2 notifications)
-- Parses CloudEvents-compliant payloads: extracts `id`, `type`, `source`, `subject` (node), `severity`, `title`, `description`, `wnm`, `errors`, `tests`, `summary`, `links`
+- Parses CloudEvents-compliant payloads: extracts `id`, `type`, `source`, `subject`, `severity`, `title`, `description`, `wnm`, `errors`, `tests`, `summary`, `links`
 - Computes a `display_title` by categorizing known patterns (maintenance, timeouts, HTTP errors, etc.)
-- Generates an `incident_hash` (SHA-256 of `title:node`) for grouping related alerts
+- Generates an `incident_hash` (SHA-256 of `title:subject`) for grouping related events
 - Batches inserts every **250 records or 5 seconds** using `psycopg2.extras.execute_values`
-- After each batch, sends `pg_notify('wis2_alerts_updates', <uuid_list>)` to wake the listener
-- Handles `ForeignKeyViolation` by auto-creating missing nodes
+- After each batch, sends `pg_notify('wis2_events_updates', <uuid_list>)` to wake the listener
+- Handles `ForeignKeyViolation` by auto-creating missing subjects
 
 ### Stage 2: NOTIFY Listener (`telemetry/listeners.py`)
 
 - Standalone process (`python wis2_listener.py`)
-- Opens a `psycopg2` connection with `ISOLATION_LEVEL_AUTOCOMMIT` and issues `LISTEN wis2_alerts_updates`
-- On notification: parses UUID payload, fetches full alert rows, and calls `channel_layer.group_send('alerts_live', ...)`
-- On reconnect: runs a catch-up query for any alerts inserted during the offline window
+- Opens a `psycopg2` connection with `ISOLATION_LEVEL_AUTOCOMMIT` and issues `LISTEN wis2_events_updates`
+- On notification: parses UUID payload, fetches full event rows, and calls `channel_layer.group_send('events_live', ...)`
+- On reconnect: runs a catch-up query for any events inserted during the offline window
 - Auto-reconnects with backoff on connection loss
 
 ### Stage 3: WebSocket Consumer (`telemetry/consumers.py`)
 
-- `AlertConsumer` (AsyncWebsocketConsumer) at `/ws/alerts/`
-- On connect: joins `alerts_live` group, checks admin status and allowed nodes
-- On `new_alerts` event: filters alerts by user permissions (admin sees all, others see only assigned nodes), sends JSON to client
+- `EventConsumer` (AsyncWebsocketConsumer) at `/ws/events/`
+- On connect: joins `events_live` group, checks admin status and allowed subjects
+- On `new_events` event: filters events by user permissions (admin sees all, others see only assigned subjects), sends JSON to client
 - Requires authentication (anonymous connections are rejected)
 
 ## Project Structure
@@ -101,9 +101,9 @@ PythonProject2/
 │   └── wsgi.py                   # WSGI fallback
 │
 ├── telemetry/                    # Django app
-│   ├── models.py                 # Alert, Node, NodeResponsible, Profile, IncidentEvent, IncidentMute
-│   ├── views.py                  # Dashboard, alert list, detail, incident management, APIs
-│   ├── consumers.py              # WebSocket consumer (AlertConsumer)
+│   ├── models.py                 # Event, Subject, SubjectResponsible, Profile, IncidentActivity, IncidentMute
+│   ├── views.py                  # Dashboard, event list, detail, incident management, APIs
+│   ├── consumers.py              # WebSocket consumer (EventConsumer)
 │   ├── listeners.py              # PostgreSQL NOTIFY listener + broadcast logic
 │   ├── routing.py                # WebSocket URL routing
 │   ├── urls.py                   # HTTP URL routing
@@ -119,7 +119,7 @@ PythonProject2/
 
 **PostgreSQL** database `wis2_alerts`. Tables are created via SQL migrations (not Django migrations for core tables).
 
-### `alerts` (managed=False — created by SQL migration)
+### `events` (managed=False — created by SQL migration)
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -127,13 +127,13 @@ PythonProject2/
 | `specversion` | varchar(10) | CloudEvents spec version |
 | `event_type` | varchar(255) | WIS2 event type URI |
 | `source` | varchar(255) | Event source |
-| `node` | varchar(255) | FK → `nodes.name` |
+| `subject` | varchar(255) | FK → `subjects.name` |
 | `event_time` | timestamptz | Event timestamp (UTC) |
 | `severity` | varchar(50) | CRITICAL / ERROR / WARNING / INFO |
-| `title` | text | Raw alert title |
+| `title` | text | Raw event title |
 | `display_title` | text | Categorized title (Maintenance, Timeout, etc.) |
-| `description` | text | Alert description |
-| `incident_hash` | text | SHA-256(`title:node`) — groups related alerts |
+| `description` | text | Event description |
+| `incident_hash` | text | SHA-256(`title:subject`) — groups related events |
 | `wnm` | jsonb | Full WIS2 Notification Message |
 | `errors` | jsonb | Quality/validation errors |
 | `tests` | jsonb | ETS test results |
@@ -141,9 +141,9 @@ PythonProject2/
 | `links` | jsonb | Related resource links |
 | `ingested_at` | timestamptz | Auto-set on insert |
 
-### `nodes` / `node_responsibles` / `node_responsible_mapping`
+### `subjects` / `subject_responsibles` / `subject_responsible_mapping`
 
-Unmanaged tables for node metadata and responsible person assignments. The ingestion daemon auto-creates missing nodes on FK violations.
+Unmanaged tables for subject metadata and responsible person assignments. The ingestion daemon auto-creates missing subjects on FK violations.
 
 ### `incident_events` / `incident_mutes`
 
@@ -151,10 +151,10 @@ Managed by Django for incident tracking: comments, email logs, notes, mute/unmut
 
 ## Role-Based Access Control
 
-- **Admin group**: Sees all alerts, full node list, `is_staff` auto-synced
-- **Regular users**: See only alerts for nodes assigned via `Profile.allowed_nodes` (M2M)
-- WebSocket consumer filters alerts per-user in real time
-- Dashboard filter choices are scoped to user's visible nodes
+- **Admin group**: Sees all events, full subject list, `is_staff` auto-synced
+- **Regular users**: See only events for subjects assigned via `Profile.allowed_subjects` (M2M)
+- WebSocket consumer filters events per-user in real time
+- Dashboard filter choices are scoped to user's visible subjects
 
 ## Setup
 
@@ -170,7 +170,7 @@ Managed by Django for incident tracking: comments, email logs, notes, mute/unmut
 git clone <repo-url> && cd PythonProject2
 python -m venv .venv
 .venv\Scripts\activate          # Windows
-# source .venv/bin/activate    # Linux/macOS
+    # source .venv/bin/activate    # Linux/macOS
 pip install -r requirements.txt
 ```
 
@@ -214,7 +214,7 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-The `nodes` and `alerts` tables are created by SQL migrations in `telemetry/migrations/`. The ingestion daemon also auto-creates missing nodes on FK violations.
+The `subjects` and `events` tables are created by SQL migrations in `telemetry/migrations/`. The ingestion daemon also auto-creates missing subjects on FK violations.
 
 ### 4. Start the services
 
@@ -233,30 +233,30 @@ python manage.py runserver
 
 The dashboard is available at `http://localhost:8000/`.
 
-## Alert retention (TTL)
+## Event retention (TTL)
 
-By default alerts are kept forever. You can enable a time-to-live from the Django admin panel:
+By default events are kept forever. You can enable a time-to-live from the Django admin panel:
 
-- Go to **Alert retention policy** in the admin.
+- Go to **Event retention policy** in the admin.
 - Check **TTL active** to enable purging, then enter a number of days.
-- Uncheck **TTL active** to keep alerts forever (the day count is ignored while disabled).
-- An impact preview shows roughly how many alerts the current setting would purge.
+- Uncheck **TTL active** to keep events forever (the day count is ignored while disabled).
+- An impact preview shows roughly how many events the current setting would purge.
 
 The cleanup runs via a management command:
 
 ```bash
 # Preview what would be deleted (recommended first)
-python manage.py purge_alerts --dry-run
+python manage.py purge_events --dry-run
 
 # Actually purge
-python manage.py purge_alerts
+python manage.py purge_events
 
 # One-off overrides
-python manage.py purge_alerts --days 30 --dry-run
-python manage.py purge_alerts --limit 5000
+python manage.py purge_events --days 30 --dry-run
+python manage.py purge_events --limit 5000
 ```
 
-Purging deletes alerts whose `ingested_at` is older than the cutoff (in batches of 5000),
+Purging deletes events whose `ingested_at` is older than the cutoff (in batches of 5000),
 along with their incident history (`incident_events`). User mute preferences are kept.
 Purging only runs when **TTL active** is checked in the admin; otherwise the command is a no-op.
 
@@ -283,7 +283,7 @@ PURGE_ON_STARTUP=false
 ```
 
 To clear the backlog immediately without waiting for 03:00, run
-`python manage.py purge_alerts --dry-run` first, then `python manage.py purge_alerts`.
+`python manage.py purge_events --dry-run` first, then `python manage.py purge_events`.
 
 ## API Endpoints
 
@@ -292,26 +292,27 @@ All endpoints require authentication (`@login_required`).
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Dashboard (severity counts, ETS data, KPI data, charts) |
-| GET | `/monitor_alerts/` | Paginated alert list with filters |
-| GET | `/alert/<uuid>/` | Alert detail (tabs: Tests, Summary, WNM, Errors, Node History) |
-| GET | `/api/alerts/` | JSON alert feed (`?since=&offset=&limit=&severity=&node=&type=`) |
-| GET | `/api/alerts/per-day/` | Daily aggregated chart data (`?days=14&group_by=severity`) |
-| GET | `/api/alert-search/` | Keyword search (`?q=`) -> JSON `{found, count}` |
-| GET | `/api/alert/<uuid>/history/` | Paginated node-history HTML fragment |
-| POST | `/alert/<uuid>/comment/` | Add incident comment |
-| POST | `/alert/<uuid>/note/` | Add timed note (`{"text": "...", "duration": 3600}`) |
-| POST | `/alert/<uuid>/mute/` | Mute incident (`{"duration": 7200}`) |
-| POST | `/alert/<uuid>/unmute/` | Unmute incident |
-| POST | `/alert/<uuid>/email/` | Email responsible person (`{"responsible_ids": [...], "note": "..."}`) |
-| POST | `/alert/<uuid>/jira/` | Create a Jira ticket for the alert (summary = display_title + title when different, description = alert description) |
-| GET | `/alert/<uuid>/activity/` | Incident activity feed (paginated) |
-| WS | `/ws/alerts/` | WebSocket — real-time alert stream (JSON) |
+| GET | `/monitor_events/` | Paginated event list with filters |
+| GET | `/event/<uuid>/` | Event detail (tabs: Tests, Summary, WNM, Errors, Subject History) |
+| GET | `/api/events/` | JSON event feed (`?since=&offset=&limit=&severity=&subject=&type=`) |
+| GET | `/api/events/per-day/` | Daily aggregated chart data (`?days=14&group_by=severity`) |
+| GET | `/api/event-search/` | Keyword search (`?q=`) -> JSON `{found, count}` |
+| GET | `/api/event/<uuid>/history/` | Paginated subject-history HTML fragment |
+| POST | `/event/<uuid>/comment/` | Add incident comment |
+| POST | `/event/<uuid>/note/` | Add timed note (`{"text": "...", "duration": 3600}`) |
+| POST | `/event/<uuid>/mute/` | Mute incident (`{"duration": 7200}`) |
+| POST | `/event/<uuid>/unmute/` | Unmute incident |
+| POST | `/event/<uuid>/email/` | Email responsible person (`{"responsible_ids": [...], "note": "..."}`) |
+| POST | `/event/<uuid>/jira/` | Create a Jira ticket for the event (summary = display_title + title when different, description = event description) |
+| POST | `/event/<uuid>/explain/` | Conversational explanation of the event via a local Ollama LLM (`{"message": "...", "history": [...]}` → `{"reply": "..."}`); answers are grounded in event facts, incident history, and responsible contacts; returns 502 when Ollama is not configured |
+| GET | `/event/<uuid>/activity/` | Incident activity feed (paginated) |
+| WS | `/ws/events/` | WebSocket — real-time event stream (JSON) |
 
 ## Key Design Decisions
 
 - **No Redis/Celery**: The channel layer uses `channels_postgres` (PostgreSQL NOTIFY/LISTEN) instead of Redis. The ingestion → listener pipeline also uses PostgreSQL NOTIFY directly. This keeps the stack to one database.
 - **Batch inserts with NOTIFY**: The ingestion daemon batches 250 records and sends a single `pg_notify` with the UUID list, keeping the listener lightweight (it only fetches full rows when notified).
-- **Incident hashing**: `SHA-256(title:node)` groups recurring alerts from the same node into a single incident timeline.
+- **Incident hashing**: `SHA-256(title:subject)` groups recurring events from the same subject into a single incident timeline.
 
 ## Services
 - wis2-daphne
@@ -319,4 +320,4 @@ All endpoints require authentication (`@login_required`).
 - wis2-listener
 
 ## SQL cleanup
-psql -h <DB_HOST> -U <DB_USER> -d wis2_alerts -f scripts/recompute_display_titles.sql
+psql -h localhost -U wis2_admin -d wis2_alerts -f scripts/recompute_display_titles.sql

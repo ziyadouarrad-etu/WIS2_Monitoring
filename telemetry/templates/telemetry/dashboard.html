@@ -13,10 +13,10 @@
   </span>
   <span style="font-size:8px;">&#9662;</span>
 </button>
-<a href="{% url 'monitor_alerts' %}" class="nav-link">Monitor Alerts</a>
-<div class="find-alert" style="position:relative;">
-  <input type="text" id="findAlertInput" placeholder="Search alerts..." onkeydown="if(event.key==='Enter')findAlert()" onfocus="var m=document.getElementById('findAlertMsg');if(m)m.style.display='none'">
-  <button class="fa-btn" onclick="findAlert()">Find</button>
+<a href="{% url 'monitor_events' %}" class="nav-link">Monitor Events</a>
+<div class="find-event" style="position:relative;">
+  <input type="text" id="findEventInput" placeholder="Search events..." onkeydown="if(event.key==='Enter')findEvent()" onfocus="var m=document.getElementById('findEventMsg');if(m)m.style.display='none'">
+  <button class="fa-btn" onclick="findEvent()">Find</button>
 </div>
 {% endblock %}
 
@@ -333,7 +333,7 @@ body::before {
 .live-item .l-sev.error { background: var(--error); color: #06141a; }
 .live-item .l-sev.warning { background: var(--warning); color: #06141a; }
 .live-item .l-sev.info { background: var(--info); color: #06141a; }
-.live-item .l-node {
+.live-item .l-subject {
   font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 600;
@@ -420,13 +420,13 @@ body::before {
 }
 .msd-sm .msd-clear:hover { color: var(--accent); background: var(--accent-dim); }
 
-.node-summary-card {
+.subject-summary-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: visible;
 }
-.node-summary-header {
+.subject-summary-header {
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   font-family: var(--font-display);
@@ -439,7 +439,7 @@ body::before {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.node-summary-header .ns-count {
+.subject-summary-header .ns-count {
   font-family: var(--font-mono);
   font-size: 10px;
   padding: 2px 7px;
@@ -472,13 +472,23 @@ body::before {
   border-color: var(--border-strong);
 }
 .ets-card-issue {
-  border-color: var(--warning);
-  box-shadow: 0 0 0 1px var(--warning);
+  border-color: var(--critical);
+  box-shadow: 0 0 0 1px var(--critical);
 }
 .ets-card-issue:hover {
   border-color: var(--critical);
   box-shadow: 0 0 0 1px var(--critical), 0 4px 16px rgba(0,0,0,0.25);
 }
+.ets-card.grade-a { border-color: var(--success); box-shadow: 0 0 0 1px var(--success); }
+.ets-card.grade-b { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.ets-card.grade-c { border-color: var(--warning); box-shadow: 0 0 0 1px var(--warning); }
+.ets-card.grade-d { border-color: var(--error); box-shadow: 0 0 0 1px var(--error); }
+.ets-card.grade-f { border-color: var(--critical); box-shadow: 0 0 0 1px var(--critical); }
+.ets-card.grade-a:hover { border-color: var(--success); box-shadow: 0 0 0 1px var(--success), 0 4px 16px rgba(0,0,0,0.25); }
+.ets-card.grade-b:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 4px 16px rgba(0,0,0,0.25); }
+.ets-card.grade-c:hover { border-color: var(--warning); box-shadow: 0 0 0 1px var(--warning), 0 4px 16px rgba(0,0,0,0.25); }
+.ets-card.grade-d:hover { border-color: var(--error); box-shadow: 0 0 0 1px var(--error), 0 4px 16px rgba(0,0,0,0.25); }
+.ets-card.grade-f:hover { border-color: var(--critical); box-shadow: 0 0 0 1px var(--critical), 0 4px 16px rgba(0,0,0,0.25); }
 .ets-card-header {
   display: flex;
   align-items: center;
@@ -486,7 +496,7 @@ body::before {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
-.ets-card-node {
+.ets-card-subject {
   font-family: var(--font-display);
   font-size: 13px;
   font-weight: 700;
@@ -533,7 +543,7 @@ body::before {
 .kpi-grade-badge-a { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
 .kpi-grade-badge-b { background: var(--success-bg); color: var(--accent); border: 1px solid var(--accent); }
 .kpi-grade-badge-c { background: var(--success-bg); color: var(--warning); border: 1px solid var(--warning); }
-.kpi-grade-badge-d { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical); }
+.kpi-grade-badge-d { background: var(--error-bg); color: var(--error); border: 1px solid var(--error); }
 .kpi-grade-badge-f { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical); }
 .kpi-card-pct {
   font-family: var(--font-mono);
@@ -568,7 +578,7 @@ body::before {
 .kpi-card-bar-fill-a { background: var(--success); }
 .kpi-card-bar-fill-b { background: var(--accent); }
 .kpi-card-bar-fill-c { background: var(--warning); }
-.kpi-card-bar-fill-d { background: var(--critical); }
+.kpi-card-bar-fill-d { background: var(--error); }
 .kpi-card-bar-fill-f { background: var(--critical); }
 
 /* summary-grid / summary-stat (reused in ETS cards) */
@@ -663,28 +673,28 @@ body::before {
 <div class="dashboard-layout">
   <div class="main-area">
     <div class="severity-cards">
-      <a href="{% url 'monitor_alerts' %}?severity=CRITICAL{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-critical">
+      <a href="{% url 'monitor_events' %}?severity=CRITICAL{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-critical">
         <span class="count">{{ severity_counts.CRITICAL }}</span>
         <span class="label">Critical</span>
       </a>
-      <a href="{% url 'monitor_alerts' %}?severity=ERROR{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-error">
+      <a href="{% url 'monitor_events' %}?severity=ERROR{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-error">
         <span class="count">{{ severity_counts.ERROR }}</span>
         <span class="label">Error</span>
       </a>
-      <a href="{% url 'monitor_alerts' %}?severity=WARNING{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-warning">
+      <a href="{% url 'monitor_events' %}?severity=WARNING{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-warning">
         <span class="count">{{ severity_counts.WARNING }}</span>
         <span class="label">Warning</span>
       </a>
-      <a href="{% url 'monitor_alerts' %}?severity=INFO{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-info">
+      <a href="{% url 'monitor_events' %}?severity=INFO{% if time_window == 'custom' %}&time_from={{ window_from|urlencode }}&time_to={{ window_to|urlencode }}{% endif %}" class="sev-card sev-info">
         <span class="count">{{ severity_counts.INFO }}</span>
         <span class="label">Info</span>
       </a>
     </div>
 
-    <!-- Alerts per Day Chart -->
+    <!-- Events per Day Chart -->
     <div class="chart-card">
       <div class="chart-header">
-        <span id="chartTitleLabel">&#9672; Alerts per Day</span>
+        <span id="chartTitleLabel">&#9672; Events per Day</span>
         <div class="chart-controls">
           <div class="chart-btn-group" id="chartGroupBy">
             <button type="button" class="chart-btn active" data-value="severity">Severity</button>
@@ -695,15 +705,15 @@ body::before {
             <button type="button" class="chart-btn active" data-value="14">14d</button>
             <button type="button" class="chart-btn" data-value="30">30d</button>
           </div>
-          <div class="msd chart-msd" id="chartNodeMsd">
+          <div class="msd chart-msd" id="chartSubjectMsd">
             <button type="button" class="msd-trigger">
-              <span class="msd-text">All Nodes</span>
+              <span class="msd-text">All Subjects</span>
               <span class="msd-arrow">&#9662;</span>
             </button>
             <div class="msd-panel">
-              <div class="msd-search"><input type="text" placeholder="Search nodes..."></div>
+              <div class="msd-search"><input type="text" placeholder="Search subjects..."></div>
               <div class="msd-options">
-                {% for n in node_choices %}
+                {% for n in subject_choices %}
                 <label class="msd-option">
                   <input type="checkbox" value="{{ n }}">
                   <span>{{ n }}</span>
@@ -716,22 +726,22 @@ body::before {
         </div>
       </div>
       <div class="chart-body">
-        <canvas id="alertsChart"></canvas>
+        <canvas id="eventsChart"></canvas>
       </div>
     </div>
 
     <!-- ETS Reports -->
-    <div class="node-summary-card">
-      <div class="node-summary-header">
+    <div class="subject-summary-card">
+      <div class="subject-summary-header">
         <span>&#9776; ETS Reports</span>
         <span class="ns-count" id="etsBadge">{{ ets_issue_count }}</span>
       </div>
       <div id="ets-card-grid" style="padding:10px;display:flex;flex-wrap:nowrap;gap:10px;overflow-x:auto;">
         {% for e in ets_data %}
         {% if e.has_issue %}
-        <div class="ets-card ets-card-issue" onclick="window.location.href='{% url 'alert_detail' e.id %}'">
+        <div class="ets-card ets-card-issue" onclick="window.location.href='{% url 'event_detail' e.id %}'">
           <div class="ets-card-header">
-            <span class="ets-card-node">{{ e.node_id }}</span>
+            <span class="ets-card-subject">{{ e.subject_id }}</span>
             <span class="ets-card-time">{{ e.event_time|date:'m/d H:i' }}</span>
           </div>
           <div class="summary-grid ets-summary-grid">
@@ -752,17 +762,17 @@ body::before {
     </div>
 
     <!-- KPI Reports -->
-    <div class="node-summary-card">
-      <div class="node-summary-header">
+    <div class="subject-summary-card">
+      <div class="subject-summary-header">
         <span>&#9776; KPI Reports</span>
         <span class="ns-count" id="kpiBadge">{{ kpi_issue_count }}</span>
       </div>
       <div id="kpi-card-grid" style="padding:10px;display:flex;flex-wrap:nowrap;gap:10px;overflow-x:auto;">
         {% for e in kpi_data %}
         {% if e.has_issue %}
-        <div class="ets-card ets-card-issue" onclick="window.location.href='{% url 'alert_detail' e.id %}'">
+        <div class="ets-card ets-card-issue{% if e.grade %} grade-{{ e.grade|lower }}{% endif %}" onclick="window.location.href='{% url 'event_detail' e.id %}'">
           <div class="ets-card-header">
-            <span class="ets-card-node">{{ e.node_id }}</span>
+            <span class="ets-card-subject">{{ e.subject_id }}</span>
             <span class="ets-card-time">{{ e.event_time|date:'m/d H:i' }}</span>
           </div>
           <div class="kpi-card-body">
@@ -798,12 +808,12 @@ body::before {
   <div class="side-panel">
     <div class="panel-card">
       <div class="panel-header">
-        <span class="live-glyph live-glyph-critical">&#9632;</span>Live CRITICAL Feed<span class="live-cap">(last 20 alerts)</span>
+        <span class="live-glyph live-glyph-critical">&#9632;</span>Live CRITICAL Feed<span class="live-cap">(last 20 events)</span>
       </div>
       <div class="panel-body live-feed-body" id="critical-feed">
-        {% for a in critical_alerts %}
-        <a href="{% url 'alert_detail' a.id %}" class="live-item sev-{{ a.severity|lower }}" data-id="{{ a.id }}" data-ingested-at="{{ a.ingested_at|date:'c' }}" data-severity="{{ a.severity }}" data-node="{{ a.node_id }}" data-event-type="{{ a.event_type }}" data-source="{{ a.source }}">
-          <span class="l-node">{{ a.node_id|slice:':2'|upper }}</span>
+        {% for a in critical_events %}
+        <a href="{% url 'event_detail' a.id %}" class="live-item sev-{{ a.severity|lower }}" data-id="{{ a.id }}" data-ingested-at="{{ a.ingested_at|date:'c' }}" data-severity="{{ a.severity }}" data-subject="{{ a.subject_id }}" data-event-type="{{ a.event_type }}" data-source="{{ a.source }}">
+          <span class="l-subject">{{ a.subject_id|slice:':2'|upper }}</span>
           <span class="l-sev {{ a.severity|lower }}">{{ a.severity|slice:":4" }}</span>
           <span class="l-title">{% firstof a.display_title a.event_type|event_type_label %}</span>
           <span class="l-time">{{ a.event_time|date:'H:i' }}</span>
@@ -813,7 +823,7 @@ body::before {
     </div>
     <div class="panel-card">
       <div class="panel-header">
-        <span class="live-glyph">&#9632;</span> Live Feed <span class="live-cap">(last 20 alerts)</span>
+        <span class="live-glyph">&#9632;</span> Live Feed <span class="live-cap">(last 20 events)</span>
       </div>
       <div class="live-filters" id="live-filters">
         <div class="msd-group" data-name="severity">
@@ -844,13 +854,13 @@ body::before {
             </div>
           </div>
         </div>
-        <div class="msd-group" data-name="node">
+        <div class="msd-group" data-name="subject">
           <div class="msd msd-sm">
-            <button type="button" class="msd-trigger"><span class="msd-text">Node: All</span><span class="msd-arrow">&#9662;</span></button>
+            <button type="button" class="msd-trigger"><span class="msd-text">Subject: All</span><span class="msd-arrow">&#9662;</span></button>
             <div class="msd-panel">
               <div class="msd-search"><input type="text" placeholder="Search..."></div>
               <div class="msd-options">
-                {% for n in node_choices %}
+                {% for n in subject_choices %}
                 <label class="msd-option"><input type="checkbox" value="{{ n }}"><span>{{ n }}</span></label>
                 {% endfor %}
               </div>
@@ -875,9 +885,9 @@ body::before {
       </div>
 
       <div class="panel-body live-feed-body" id="live-feed">
-        {% for a in mini_alerts %}
-        <a href="{% url 'alert_detail' a.id %}" class="live-item sev-{{ a.severity|lower }}" data-id="{{ a.id }}" data-ingested-at="{{ a.ingested_at|date:'c' }}" data-severity="{{ a.severity }}" data-node="{{ a.node_id }}" data-event-type="{{ a.event_type }}" data-source="{{ a.source }}">
-          <span class="l-node">{{ a.node_id|slice:':2'|upper }}</span>
+        {% for a in mini_events %}
+        <a href="{% url 'event_detail' a.id %}" class="live-item sev-{{ a.severity|lower }}" data-id="{{ a.id }}" data-ingested-at="{{ a.ingested_at|date:'c' }}" data-severity="{{ a.severity }}" data-subject="{{ a.subject_id }}" data-event-type="{{ a.event_type }}" data-source="{{ a.source }}">
+          <span class="l-subject">{{ a.subject_id|slice:':2'|upper }}</span>
           <span class="l-sev {{ a.severity|lower }}">{{ a.severity|slice:":4" }}</span>
           <span class="l-title">{% firstof a.display_title a.event_type|event_type_label %}</span>
           <span class="l-time">{{ a.event_time|date:'H:i' }}</span>
@@ -895,9 +905,9 @@ body::before {
 <script src="{% static 'telemetry/js/chart.umd.min.js' %}"></script>
 <script>
 (function(){
-  /* Alerts per Day chart */
+  /* Events per Day chart */
   (function(){
-    var canvas = document.getElementById('alertsChart');
+    var canvas = document.getElementById('eventsChart');
     if (!canvas || typeof Chart === 'undefined') return;
     var chart = null;
     var activeWindow = '{{ time_window|escapejs }}';
@@ -977,11 +987,11 @@ body::before {
             params.set('to', activeTo);
           }
         }
-        document.querySelectorAll('#chartNodeMsd .msd-option input:checked').forEach(function(cb) { params.append('node', cb.value); });
-        var resp = await fetch('/api/alerts/per-day/?' + params.toString());
+        document.querySelectorAll('#chartSubjectMsd .msd-option input:checked').forEach(function(cb) { params.append('subject', cb.value); });
+        var resp = await fetch('/api/events/per-day/?' + params.toString());
         var data = await resp.json();
         var titleEl = document.getElementById('chartTitleLabel');
-        if (titleEl) titleEl.textContent = (data.granularity === 'hour' ? 'Alerts per Hour' : 'Alerts per Day');
+        if (titleEl) titleEl.textContent = (data.granularity === 'hour' ? 'Events per Hour' : 'Events per Day');
         buildChart(data.labels, data.datasets);
       } catch(e) { console.warn('Chart fetch failed:', e); }
     }
@@ -1003,7 +1013,7 @@ body::before {
     });
 
     (function(){
-      var msd = document.getElementById('chartNodeMsd');
+      var msd = document.getElementById('chartSubjectMsd');
       if (!msd) return;
       var trigger = msd.querySelector('.msd-trigger');
       var panel = msd.querySelector('.msd-panel');
@@ -1107,7 +1117,7 @@ body::before {
     });
     if (filters.severity && !filters.severity.includes(item.dataset.severity)) return false;
     if (filters.type && !filters.type.includes(eventTypeLabel(item.dataset.eventType))) return false;
-    if (filters.node && !filters.node.includes(item.dataset.node)) return false;
+    if (filters.subject && !filters.subject.includes(item.dataset.subject)) return false;
     if (filters.source && !filters.source.includes(item.dataset.source)) return false;
     return true;
   }
@@ -1196,16 +1206,16 @@ body::before {
 
   function createLiveItem(a) {
     const el = document.createElement('a');
-    el.href = '/alert/' + a.id + '/';
+    el.href = '/event/' + a.id + '/';
     el.className = 'live-item sev-' + a.severity.toLowerCase() + ' new';
     el.dataset.id = a.id;
     el.dataset.ingestedAt = a.ingested_at || '';
     el.dataset.severity = a.severity;
-    el.dataset.node = a.node_id || a.node || '';
+    el.dataset.subject = a.subject_id || a.subject || '';
     el.dataset.eventType = a.event_type || '';
     el.dataset.source = a.source || '';
-    var nodeAbbr = (el.dataset.node).substring(0,2).toUpperCase();
-    el.innerHTML = '<span class="l-node">' + escHtml(nodeAbbr) + '</span>'
+    var subjectAbbr = (el.dataset.subject).substring(0,2).toUpperCase();
+    el.innerHTML = '<span class="l-subject">' + escHtml(subjectAbbr) + '</span>'
       + '<span class="l-sev ' + escHtml(a.severity.toLowerCase()) + '">' + escHtml(a.severity.substring(0,4)) + '</span>'
       + '<span class="l-title">' + escHtml((a.display_title || eventTypeLabel(a.event_type) || '').substring(0,35)) + '</span>'
       + '<span class="l-time">' + escHtml(a.event_time ? a.event_time.substring(11,16) : '') + '</span>';
@@ -1227,15 +1237,15 @@ body::before {
     }
   }
 
-  function processAlerts(alerts, incrementCounts) {
+  function processEvents(events, incrementCounts) {
     const existingIds = new Set();
     liveFeed.querySelectorAll('.live-item').forEach(row => existingIds.add(row.dataset.id));
-    const newAlerts = alerts.filter(a => !existingIds.has(a.id));
-    if (newAlerts.length === 0) return;
-    const latest = newAlerts.reduce((a, b) => a.ingested_at > b.ingested_at ? a : b);
+    const newEvents = events.filter(a => !existingIds.has(a.id));
+    if (newEvents.length === 0) return;
+    const latest = newEvents.reduce((a, b) => a.ingested_at > b.ingested_at ? a : b);
     if (latest.ingested_at > maxIngestedAt) maxIngestedAt = latest.ingested_at;
-    newAlerts.sort((a, b) => a.ingested_at.localeCompare(b.ingested_at));
-    newAlerts.forEach(function(a) {
+    newEvents.sort((a, b) => a.ingested_at.localeCompare(b.ingested_at));
+    newEvents.forEach(function(a) {
       var item = createLiveItem(a);
       insertIntoSorted(item, liveFeed);
       item.style.display = matchesFilters(item) ? '' : 'none';
@@ -1243,7 +1253,7 @@ body::before {
     while (liveFeed.children.length > 20) liveFeed.removeChild(liveFeed.lastChild);
 
     if (incrementCounts && sevCardData) {
-      newAlerts.forEach(function(a) {
+      newEvents.forEach(function(a) {
         if (isCustomWindow) {
           var t = Date.parse(a.event_time);
           if (!(t >= customFromMs && t <= customToMs)) return;
@@ -1264,7 +1274,7 @@ body::before {
     if (criticalFeed) {
       var critExistingIds = new Set();
       criticalFeed.querySelectorAll('.live-item').forEach(function(row) { critExistingIds.add(row.dataset.id); });
-      var newCritical = newAlerts.filter(function(a) { return a.severity === 'CRITICAL' && !critExistingIds.has(a.id); });
+      var newCritical = newEvents.filter(function(a) { return a.severity === 'CRITICAL' && !critExistingIds.has(a.id); });
       if (newCritical.length > 0) {
         newCritical.sort(function(a, b) { return a.ingested_at.localeCompare(b.ingested_at); });
         newCritical.forEach(function(a) {
@@ -1278,7 +1288,7 @@ body::before {
 
   (function() {
     var wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var wsUrl = wsProtocol + '//' + window.location.host + '/ws/alerts/';
+    var wsUrl = wsProtocol + '//' + window.location.host + '/ws/events/';
     var reconnectDelay = 1000;
 
     function connect() {
@@ -1287,8 +1297,8 @@ body::before {
       ws.onmessage = function(e) {
         try {
           var data = JSON.parse(e.data);
-          if (data.type === 'new_alerts' && data.alerts && data.alerts.length > 0) {
-            processAlerts(data.alerts, true);
+          if (data.type === 'new_events' && data.events && data.events.length > 0) {
+            processEvents(data.events, true);
           }
         } catch(err) { console.warn('WS error:', err); }
       };
@@ -1317,26 +1327,26 @@ body::before {
   });
 })();
 function showToast(text) {
-  var old = document.getElementById('findAlertMsg');
+  var old = document.getElementById('findEventMsg');
   if (old) old.remove();
   var msg = document.createElement('div');
-  msg.id = 'findAlertMsg';
+  msg.id = 'findEventMsg';
   msg.textContent = text;
   msg.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:8px 16px;z-index:99999;font-family:var(--font-mono);font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);';
   document.body.appendChild(msg);
   setTimeout(function(){ msg.remove(); }, 2000);
 }
-function findAlert() {
-  var input = document.getElementById('findAlertInput');
+function findEvent() {
+  var input = document.getElementById('findEventInput');
   var kw = input.value.trim();
   if (!kw) return;
-  fetch('/api/alert-search/?q=' + encodeURIComponent(kw))
+  fetch('/api/event-search/?q=' + encodeURIComponent(kw))
     .then(function(r) { if (!r.ok) throw Error(); return r.json(); })
     .then(function(data) {
-      if (data.found) { window.location = "{% url 'monitor_alerts' %}?q=" + encodeURIComponent(kw); }
-      else { showToast('No alerts match your search.'); }
+      if (data.found) { window.location = "{% url 'monitor_events' %}?q=" + encodeURIComponent(kw); }
+      else { showToast('No events match your search.'); }
     })
-    .catch(function(){ showToast('Could not check alert. Please try again.'); });
+    .catch(function(){ showToast('Could not check event. Please try again.'); });
 }
 </script>
 {% endblock %}

@@ -57,17 +57,18 @@ def _api_error(step, resp):
     return f"Gmail API error at {step} ({resp.status_code}): {detail}"
 
 
-def send_email(subject, body, to_email):
-    if not is_configured():
-        from django.core.mail import send_mail
-        send_mail(
-            subject=subject,
-            message=body,
-            from_email=None,
-            recipient_list=[to_email],
-            fail_silently=False,
-        )
-        return
+def _send_via_smtp(subject, body, to_email):
+    from django.core.mail import send_mail
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=None,
+        recipient_list=[to_email],
+        fail_silently=False,
+    )
+
+
+def _send_via_gmail(subject, body, to_email):
     try:
         token = _access_token()
         raw = _build_raw_message(subject, body, to_email)
@@ -84,3 +85,29 @@ def send_email(subject, body, to_email):
             raise RuntimeError(_api_error("send", resp))
     except requests.RequestException as exc:
         raise RuntimeError(f"Gmail API network error: {exc}") from exc
+
+
+def send_email(subject, body, to_email):
+    """Send via SMTP first, falling back to the Gmail API when SMTP fails.
+
+    Raises a RuntimeError describing both failures when every path fails.
+    """
+    try:
+        _send_via_smtp(subject, body, to_email)
+        return
+    except Exception as smtp_err:
+        logger.warning("SMTP failed (%s); falling back to Gmail API", smtp_err)
+        smtp_msg = str(smtp_err)
+
+    if is_configured():
+        try:
+            _send_via_gmail(subject, body, to_email)
+            return
+        except Exception as api_err:
+            raise RuntimeError(
+                f"SMTP failed: {smtp_msg} — Gmail API failed: {api_err}"
+            ) from api_err
+
+    raise RuntimeError(
+        f"SMTP failed: {smtp_msg} — Gmail API is not configured"
+    ) from None
